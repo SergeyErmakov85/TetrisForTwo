@@ -2,30 +2,45 @@ import React, { useState, useEffect, ChangeEvent } from "react";
 import "@fontsource/inter";
 import { useAudio } from "./lib/stores/useAudio";
 import { useGame, GameMode, GamePhase } from "./lib/stores/useGame";
-import { BOARD_WIDTH, BOARD_HEIGHT, TETROMINOES, TETROMINO_COLORS, TetrominoType } from "./lib/constants";
+import { BOARD_WIDTH, BOARD_HEIGHT, TetrominoType } from "./lib/constants";
 import GameBoard from "./components/GameBoard";
 import CoopGameBoard from "./components/CoopGameBoard";
 
-// Simple 2D version of the game for testing display
 function App() {
-  const { setBackgroundMusic, setHitSound, setSuccessSound, playSuccess, isMuted, toggleMute } = useAudio();
-  const { mode, setMode, scoreLimit, setScoreLimit, phase, end, restart } = useGame();
-  const [score, setScore] = useState(0);
+  // Game audio
+  const { 
+    setBackgroundMusic, 
+    setHitSound, 
+    setSuccessSound, 
+    playSuccess, 
+    isMuted, 
+    toggleMute 
+  } = useAudio();
   
-  // For demo: displaying sample Tetris pieces
-  const [player1Board, setPlayer1Board] = useState<(TetrominoType | null)[][]>(
-    Array(20).fill(null).map(() => Array(10).fill(null))
-  );
-  const [player2Board, setPlayer2Board] = useState<(TetrominoType | null)[][]>(
-    Array(20).fill(null).map(() => Array(10).fill(null))
-  );
-  const [coopBoard, setCoopBoard] = useState<(TetrominoType | null)[][]>(
-    Array(24).fill(null).map(() => Array(14).fill(null))
-  );
+  // Game state
+  const { 
+    mode, 
+    setMode, 
+    scoreLimit, 
+    setScoreLimit, 
+    phase, 
+    end, 
+    restart 
+  } = useGame();
+  
+  // UI state
+  const [score, setScore] = useState(0);
   const [countdown, setCountdown] = useState<number | null>(3);
   const [showModeSelect, setShowModeSelect] = useState(true);
   const [showCoopSettings, setShowCoopSettings] = useState(false);
   const [tempScoreLimit, setTempScoreLimit] = useState(scoreLimit);
+  
+  // Player state
+  const [player1Score, setPlayer1Score] = useState(0);
+  const [player2Score, setPlayer2Score] = useState(0);
+  const [player1GameOver, setPlayer1GameOver] = useState(false);
+  const [player2GameOver, setPlayer2GameOver] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   // Initialize audio elements
   useEffect(() => {
@@ -53,6 +68,15 @@ function App() {
     }
   }, [setBackgroundMusic, setHitSound, setSuccessSound]);
 
+  // Effect to start playing after countdown finishes
+  useEffect(() => {
+    if (countdown === null && !showModeSelect && !showCoopSettings) {
+      setIsPlaying(true);
+    } else {
+      setIsPlaying(false);
+    }
+  }, [countdown, showModeSelect, showCoopSettings]);
+
   // Handle game mode selection
   const handleModeSelect = (selectedMode: GameMode) => {
     setMode(selectedMode);
@@ -73,75 +97,17 @@ function App() {
     }
   };
   
-  // Create sample tetris pieces for visualization
-  useEffect(() => {
-    if (countdown === null && !showModeSelect && !showCoopSettings) {
-      // Sample pieces for the boards after countdown ends
-      const tetrisTypes: TetrominoType[] = ['I', 'J', 'L', 'O', 'S', 'T', 'Z'];
-      
-      // Create sample pieces for player 1 board
-      const p1Board = Array(20).fill(null).map(() => Array(10).fill(null));
-      // Add some blocks at the bottom for player 1
-      for (let y = 0; y < 4; y++) {
-        for (let x = 0; x < 10; x++) {
-          if (Math.random() > 0.5) {
-            p1Board[19-y][x] = tetrisTypes[Math.floor(Math.random() * tetrisTypes.length)];
-          }
-        }
-      }
-      // Add active piece for player 1 (T shape at top)
-      p1Board[0][4] = 'T';
-      p1Board[1][3] = 'T';
-      p1Board[1][4] = 'T';
-      p1Board[1][5] = 'T';
-      setPlayer1Board(p1Board);
-      
-      // Create sample pieces for player 2 board
-      const p2Board = Array(20).fill(null).map(() => Array(10).fill(null));
-      // Add some blocks at the bottom for player 2
-      for (let y = 0; y < 5; y++) {
-        for (let x = 0; x < 10; x++) {
-          if (Math.random() > 0.4) {
-            p2Board[19-y][x] = tetrisTypes[Math.floor(Math.random() * tetrisTypes.length)];
-          }
-        }
-      }
-      // Add active piece for player 2 (I shape at top)
-      p2Board[0][3] = 'I';
-      p2Board[0][4] = 'I';
-      p2Board[0][5] = 'I';
-      p2Board[0][6] = 'I';
-      setPlayer2Board(p2Board);
-      
-      // Create sample pieces for coop board
-      const cBoard = Array(24).fill(null).map(() => Array(14).fill(null));
-      // Add some blocks at the bottom
-      for (let y = 0; y < 6; y++) {
-        for (let x = 0; x < 14; x++) {
-          if (Math.random() > 0.5) {
-            cBoard[23-y][x] = tetrisTypes[Math.floor(Math.random() * tetrisTypes.length)];
-          }
-        }
-      }
-      // Add player 1 piece (L shape on left)
-      cBoard[5][3] = 'L';
-      cBoard[6][3] = 'L';
-      cBoard[7][3] = 'L';
-      cBoard[7][4] = 'L';
-      
-      // Add player 2 piece (S shape on right)
-      cBoard[4][10] = 'S';
-      cBoard[4][11] = 'S';
-      cBoard[5][9] = 'S';
-      cBoard[5][10] = 'S';
-      setCoopBoard(cBoard);
-    }
-  }, [countdown, showModeSelect, showCoopSettings]);
-
   // Start the game with a countdown
   const startGame = () => {
     setShowModeSelect(false);
     setShowCoopSettings(false);
+    
+    // Reset scores
+    setScore(0);
+    setPlayer1Score(0);
+    setPlayer2Score(0);
+    setPlayer1GameOver(false);
+    setPlayer2GameOver(false);
     
     // Apply co-op score limit if in co-op mode
     if (mode === "coop") {
@@ -331,22 +297,6 @@ function App() {
       </div>
     );
   }
-
-  // State for managing player scores and game over status
-  const [player1Score, setPlayer1Score] = useState(0);
-  const [player2Score, setPlayer2Score] = useState(0);
-  const [player1GameOver, setPlayer1GameOver] = useState(false);
-  const [player2GameOver, setPlayer2GameOver] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-
-  // Effect to start playing after countdown finishes
-  useEffect(() => {
-    if (countdown === null && !showModeSelect && !showCoopSettings) {
-      setIsPlaying(true);
-    } else {
-      setIsPlaying(false);
-    }
-  }, [countdown, showModeSelect, showCoopSettings]);
 
   // Render the game based on the selected mode
   return (

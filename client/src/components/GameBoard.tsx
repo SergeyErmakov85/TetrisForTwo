@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useTetris } from '../hooks/useTetris';
-import { TETROMINO_COLORS, PLAYER_CONTROLS, TetrominoType } from '../lib/constants';
+import { TETROMINO_COLORS, PLAYER_CONTROLS } from '../lib/constants';
 import { useAudio } from '../lib/stores/useAudio';
 
 interface GameBoardProps {
@@ -27,7 +27,8 @@ const GameBoard: React.FC<GameBoardProps> = ({
   boardWidth,
   boardHeight
 }) => {
-  // Initialize Tetris game logic
+  const { playHit } = useAudio();
+  
   const {
     board,
     activePiece,
@@ -39,191 +40,228 @@ const GameBoard: React.FC<GameBoardProps> = ({
     hardDrop,
     reset
   } = useTetris(player);
-  
-  const { playHit } = useAudio();
-  const lastKeyPressTime = useRef<{[key: string]: number}>({});
-  const keyRepeatDelay = 100; // ms delay before repeating a key press
-  const gameLoopRef = useRef<number | null>(null);
-  const lastDropTime = useRef<number>(Date.now());
-  const dropInterval = useRef<number>(1000); // Start with 1 second between drops
-  
-  // Copy the gameOver state to parent component
-  useEffect(() => {
-    if (gameOver !== isGameOver) {
-      setGameOver(gameOver);
-    }
-  }, [gameOver, isGameOver, setGameOver]);
-  
-  // Update parent score
+
+  // Update score and game over state
   useEffect(() => {
     setScore(score);
   }, [score, setScore]);
-  
-  // Reset the game when isPlaying changes
+
+  useEffect(() => {
+    if (gameOver && !isGameOver) {
+      setGameOver(true);
+      console.log(`Player ${player} - Game Over!`);
+    }
+  }, [gameOver, isGameOver, player, setGameOver]);
+
+  // Reset game when isPlaying changes
   useEffect(() => {
     if (isPlaying) {
       reset();
     }
   }, [isPlaying, reset]);
-  
-  // Handle keyboard input
+
+  // Keyboard controls
   useEffect(() => {
     if (!isPlaying || isGameOver) return;
-    
-    // Get the controls for this player
+
     const controls = PLAYER_CONTROLS[player];
     
     const handleKeyDown = (e: KeyboardEvent) => {
-      const now = Date.now();
-      // Don't process repeated keys too quickly (except for hard drop)
-      if (
-        lastKeyPressTime.current[e.code] && 
-        now - lastKeyPressTime.current[e.code] < keyRepeatDelay &&
-        !isControlKey(e.code, controls.hardDrop)
-      ) {
-        return;
-      }
-      
-      lastKeyPressTime.current[e.code] = now;
-      
-      // Check which control was pressed
-      if (isControlKey(e.code, controls.moveLeft)) {
-        if (movePiece(-1, 0)) playHit();
-      } else if (isControlKey(e.code, controls.moveRight)) {
-        if (movePiece(1, 0)) playHit();
-      } else if (isControlKey(e.code, controls.moveDown)) {
-        if (movePiece(0, -1)) playHit();
-      } else if (isControlKey(e.code, controls.rotateLeft)) {
-        if (rotatePiece('left')) playHit();
-      } else if (isControlKey(e.code, controls.rotateRight)) {
-        if (rotatePiece('right')) playHit();
-      } else if (isControlKey(e.code, controls.hardDrop)) {
-        hardDrop();
-        playHit();
+      if (isControlKey(e.code, 'moveLeft')) {
+        movePiece(-1, 0) && playHit();
+      } else if (isControlKey(e.code, 'moveRight')) {
+        movePiece(1, 0) && playHit();
+      } else if (isControlKey(e.code, 'moveDown')) {
+        movePiece(0, 1) && playHit();
+      } else if (isControlKey(e.code, 'rotateLeft')) {
+        rotatePiece('left') && playHit();
+      } else if (isControlKey(e.code, 'rotateRight')) {
+        rotatePiece('right') && playHit();
+      } else if (isControlKey(e.code, 'hardDrop')) {
+        hardDrop() && playHit();
       }
     };
     
-    const handleKeyUp = (e: KeyboardEvent) => {
-      // Reset the key press time when key is released
-      delete lastKeyPressTime.current[e.code];
-    };
-    
-    // Helper to check if a key matches a control
     function isControlKey(keyCode: string, controlName: string): boolean {
-      // Map control names to their key codes
-      const controlMap: Record<string, string[]> = {
-        'player1MoveLeft': ['KeyA'],
-        'player1MoveRight': ['KeyD'],
-        'player1MoveDown': ['KeyS'],
-        'player1RotateLeft': ['KeyQ'],
-        'player1RotateRight': ['KeyE'],
-        'player1HardDrop': ['KeyW'],
-        'player2MoveLeft': ['ArrowLeft'],
-        'player2MoveRight': ['ArrowRight'],
-        'player2MoveDown': ['ArrowDown'],
-        'player2RotateLeft': ['Period'],
-        'player2RotateRight': ['Slash'],
-        'player2HardDrop': ['ArrowUp']
-      };
-      
-      return controlMap[controlName]?.includes(keyCode) || false;
+      // Find the control name in CONTROLS
+      const controlObj = CONTROLS.find(control => control.name === controls[controlName]);
+      return controlObj ? controlObj.keys.includes(keyCode) : false;
     }
-    
-    // Add event listeners
+
     window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
     
-    // Clean up event listeners on unmount
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
     };
   }, [isPlaying, isGameOver, player, movePiece, rotatePiece, hardDrop, playHit]);
+
+  // Game loop - automatically move piece down
+  const lastTimeRef = useRef<number>(0);
+  const frameIdRef = useRef<number>(0);
   
-  // Game loop - auto-drop pieces
   useEffect(() => {
-    if (!isPlaying || isGameOver) {
-      if (gameLoopRef.current) {
-        cancelAnimationFrame(gameLoopRef.current);
-        gameLoopRef.current = null;
+    if (!isPlaying || isGameOver) return;
+    
+    function gameLoop(timestamp: number) {
+      if (!lastTimeRef.current) {
+        lastTimeRef.current = timestamp;
       }
-      return;
+      
+      const deltaTime = timestamp - lastTimeRef.current;
+      
+      // Move piece down every 1000ms, speed up based on score
+      const fallSpeed = Math.max(100, 1000 - Math.floor(score / 500) * 100);
+      
+      if (deltaTime > fallSpeed) {
+        movePiece(0, 1);
+        lastTimeRef.current = timestamp;
+      }
+      
+      frameIdRef.current = requestAnimationFrame(gameLoop);
     }
     
-    const gameLoop = () => {
-      const now = Date.now();
-      
-      // Auto-drop the active piece
-      if (now - lastDropTime.current > dropInterval.current) {
-        movePiece(0, -1);
-        lastDropTime.current = now;
-        
-        // Gradually increase the drop speed as score increases
-        dropInterval.current = Math.max(100, 1000 - Math.floor(score / 500) * 100);
-      }
-      
-      gameLoopRef.current = requestAnimationFrame(gameLoop);
-    };
+    frameIdRef.current = requestAnimationFrame(gameLoop);
     
-    gameLoopRef.current = requestAnimationFrame(gameLoop);
-    
-    // Clean up the game loop
     return () => {
-      if (gameLoopRef.current) {
-        cancelAnimationFrame(gameLoopRef.current);
-        gameLoopRef.current = null;
-      }
+      cancelAnimationFrame(frameIdRef.current);
     };
-  }, [isPlaying, isGameOver, movePiece, score]);
+  }, [isPlaying, isGameOver, score, movePiece]);
   
-  // Render the combined state - board with active piece overlaid
-  const combinedBoard = board.map(row => [...row]);
-  
-  // Overlay the active piece on the board
-  if (activePiece) {
-    activePiece.shape.forEach((row, y) => {
-      row.forEach((cell, x) => {
-        if (cell) {
-          const boardY = y + activePiece.position.y;
-          const boardX = x + activePiece.position.x;
-          if (
-            boardY >= 0 && 
-            boardY < boardHeight && 
-            boardX >= 0 && 
-            boardX < boardWidth
-          ) {
-            combinedBoard[boardY][boardX] = activePiece.type;
-          }
-        }
-      });
-    });
-  }
+  // Calculate cell size
+  const cellWidth = width / boardWidth;
+  const cellHeight = height / boardHeight;
   
   return (
-    <div 
-      style={{ 
-        width: `${width}px`, 
-        height: `${height}px`, 
-        backgroundColor: "#1f2937", 
-        border: `2px solid ${player === 1 ? "#4f46e5" : "#ef4444"}`,
-        display: "grid",
-        gridTemplateColumns: `repeat(${boardWidth}, 1fr)`,
-        gridTemplateRows: `repeat(${boardHeight}, 1fr)`,
-        gap: "1px",
-        padding: "2px"
-      }}
-    >
-      {/* Render the combined board with active pieces */}
-      {combinedBoard.flat().map((cell, i) => (
+    <div style={{ position: 'relative' }}>
+      {/* Main game board */}
+      <div 
+        style={{ 
+          width: `${width}px`, 
+          height: `${height}px`, 
+          backgroundColor: '#1f2937', 
+          border: player === 1 ? '2px solid #4f46e5' : '2px solid #ef4444',
+          display: 'grid',
+          gridTemplateColumns: `repeat(${boardWidth}, 1fr)`,
+          gridTemplateRows: `repeat(${boardHeight}, 1fr)`,
+          gap: '1px',
+          padding: '2px'
+        }}
+      >
+        {board.flat().map((cell, i) => {
+          const x = i % boardWidth;
+          const y = Math.floor(i / boardWidth);
+          
+          // Check if this position contains the active piece
+          let isActivePiece = false;
+          let activePieceType = null;
+          
+          if (activePiece) {
+            const { shape, type, position } = activePiece;
+            
+            shape.forEach((row, rowIndex) => {
+              row.forEach((value, colIndex) => {
+                if (value && 
+                    y === position.y + rowIndex && 
+                    x === position.x + colIndex) {
+                  isActivePiece = true;
+                  activePieceType = type;
+                }
+              });
+            });
+          }
+          
+          const cellType = isActivePiece ? activePieceType : cell;
+          
+          return (
+            <div 
+              key={i} 
+              style={{ 
+                backgroundColor: cellType ? TETROMINO_COLORS[cellType] : '#374151',
+                boxShadow: cellType ? 'inset 0 0 5px rgba(255,255,255,0.5)' : 'none',
+                borderRadius: cellType ? '2px' : '0'
+              }}
+            />
+          );
+        })}
+      </div>
+      
+      {/* Next piece display */}
+      {nextPiece && (
         <div 
-          key={i} 
           style={{ 
-            backgroundColor: cell ? TETROMINO_COLORS[cell] : "#374151",
-            boxShadow: cell ? "inset 0 0 5px rgba(255,255,255,0.5)" : "none",
-            borderRadius: cell ? "2px" : "0"
+            position: 'absolute', 
+            top: '10px', 
+            right: '-90px',
+            width: '80px',
+            height: '80px',
+            backgroundColor: '#1f2937',
+            border: player === 1 ? '1px solid #4f46e5' : '1px solid #ef4444',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gridTemplateRows: 'repeat(4, 1fr)',
+            gap: '1px',
+            padding: '2px'
           }}
-        />
-      ))}
+        >
+          {Array(16).fill(null).map((_, i) => {
+            const x = i % 4;
+            const y = Math.floor(i / 4);
+            
+            let showPiece = false;
+            
+            // Center the piece in the next piece display
+            const offsetX = nextPiece.shape[0].length === 4 ? 0 : 
+                           nextPiece.shape[0].length === 3 ? 0 : 
+                           nextPiece.shape[0].length === 2 ? 1 : 0;
+            
+            const offsetY = nextPiece.shape.length === 4 ? 0 : 
+                           nextPiece.shape.length === 3 ? 0 : 
+                           nextPiece.shape.length === 2 ? 1 : 0;
+            
+            if (y - offsetY >= 0 && 
+                y - offsetY < nextPiece.shape.length && 
+                x - offsetX >= 0 && 
+                x - offsetX < nextPiece.shape[0].length && 
+                nextPiece.shape[y - offsetY][x - offsetX]) {
+              showPiece = true;
+            }
+            
+            return (
+              <div 
+                key={i} 
+                style={{ 
+                  backgroundColor: showPiece ? TETROMINO_COLORS[nextPiece.type] : '#374151',
+                  boxShadow: showPiece ? 'inset 0 0 5px rgba(255,255,255,0.5)' : 'none',
+                  borderRadius: showPiece ? '2px' : '0'
+                }}
+              />
+            );
+          })}
+        </div>
+      )}
+      
+      {/* Game over overlay */}
+      {isGameOver && (
+        <div 
+          style={{ 
+            position: 'absolute', 
+            top: '0', 
+            left: '0',
+            width: '100%',
+            height: '100%',
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+            color: '#ffffff',
+            zIndex: 10
+          }}
+        >
+          <h3 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Game Over</h3>
+          <p>Score: {score}</p>
+        </div>
+      )}
     </div>
   );
 };
