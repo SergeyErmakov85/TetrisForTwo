@@ -54,13 +54,17 @@ export function checkCollision(
 
 // Rotate a matrix (shape) either left or right
 export function rotateMatrix(matrix: number[][], direction: 'left' | 'right'): number[][] {
-  const rotated = [];
   const n = matrix.length;
+  const rotated: number[][] = [];
+  
+  // Initialize the rotated matrix
+  for (let i = 0; i < n; i++) {
+    rotated[i] = [];
+  }
   
   if (direction === 'right') {
     // Rotate 90 degrees clockwise
     for (let i = 0; i < n; i++) {
-      rotated.push([]);
       for (let j = 0; j < n; j++) {
         rotated[i][j] = matrix[n - j - 1][i];
       }
@@ -68,7 +72,6 @@ export function rotateMatrix(matrix: number[][], direction: 'left' | 'right'): n
   } else {
     // Rotate 90 degrees counter-clockwise
     for (let i = 0; i < n; i++) {
-      rotated.push([]);
       for (let j = 0; j < n; j++) {
         rotated[i][j] = matrix[j][n - i - 1];
       }

@@ -66,15 +66,23 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
   
   // Spawn new pieces for both players
   const spawnNewPieces = () => {
+    // Generate different tetromino types for each player
+    const type1 = getRandomTetromino();
+    // Make sure player 2 gets a different type
+    let type2;
+    do {
+      type2 = getRandomTetromino();
+    } while (type2 === type1);
+    
     // Player 1 piece (left side)
     setPlayer1Piece({
-      type: getRandomTetromino(),
+      type: type1,
       position: { x: Math.floor(boardWidth / 4), y: 0 }
     });
     
     // Player 2 piece (right side)
     setPlayer2Piece({
-      type: getRandomTetromino(),
+      type: type2,
       position: { x: Math.floor(boardWidth * 3 / 4), y: 0 }
     });
   };
@@ -138,17 +146,35 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
     // Check win condition
     if (newScore >= scoreLimit) {
       end();
+      // Stop game loop and prevent further interaction
+      return;
     }
     
-    // Spawn new piece for the player
+    // Spawn new piece for the player with a different type
     if (player === 1) {
+      // Generate a type different from player 2's type if it exists
+      let newType = getRandomTetromino();
+      if (player2Piece) {
+        while (newType === player2Piece.type) {
+          newType = getRandomTetromino();
+        }
+      }
+      
       setPlayer1Piece({
-        type: getRandomTetromino(),
+        type: newType,
         position: { x: Math.floor(boardWidth / 4), y: 0 }
       });
     } else {
+      // Generate a type different from player 1's type if it exists
+      let newType = getRandomTetromino();
+      if (player1Piece) {
+        while (newType === player1Piece.type) {
+          newType = getRandomTetromino();
+        }
+      }
+      
       setPlayer2Piece({
-        type: getRandomTetromino(),
+        type: newType,
         position: { x: Math.floor(boardWidth * 3 / 4), y: 0 }
       });
     }
