@@ -2,19 +2,23 @@ import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 
 export type GamePhase = "ready" | "playing" | "ended";
+export type GameMode = "versus" | "coop";
 
 interface GameState {
   phase: GamePhase;
+  mode: GameMode;
   
   // Actions
   start: () => void;
   restart: () => void;
   end: () => void;
+  setMode: (mode: GameMode) => void;
 }
 
 export const useGame = create<GameState>()(
   subscribeWithSelector((set) => ({
     phase: "ready",
+    mode: "versus", // Default to versus mode
     
     start: () => {
       set((state) => {
@@ -38,6 +42,10 @@ export const useGame = create<GameState>()(
         }
         return {};
       });
+    },
+    
+    setMode: (mode: GameMode) => {
+      set(() => ({ mode }));
     }
   }))
 );
