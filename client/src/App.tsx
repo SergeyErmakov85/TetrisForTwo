@@ -2,11 +2,13 @@ import React, { useState, useEffect, ChangeEvent } from "react";
 import "@fontsource/inter";
 import { useAudio } from "./lib/stores/useAudio";
 import { useGame, GameMode, GamePhase } from "./lib/stores/useGame";
-import { TETROMINOES, TETROMINO_COLORS, TetrominoType } from "./lib/constants";
+import { BOARD_WIDTH, BOARD_HEIGHT, TETROMINOES, TETROMINO_COLORS, TetrominoType } from "./lib/constants";
+import GameBoard from "./components/GameBoard";
+import CoopGameBoard from "./components/CoopGameBoard";
 
 // Simple 2D version of the game for testing display
 function App() {
-  const { setBackgroundMusic, setHitSound, setSuccessSound, playSuccess } = useAudio();
+  const { setBackgroundMusic, setHitSound, setSuccessSound, playSuccess, isMuted, toggleMute } = useAudio();
   const { mode, setMode, scoreLimit, setScoreLimit, phase, end, restart } = useGame();
   const [score, setScore] = useState(0);
   
@@ -330,6 +332,22 @@ function App() {
     );
   }
 
+  // State for managing player scores and game over status
+  const [player1Score, setPlayer1Score] = useState(0);
+  const [player2Score, setPlayer2Score] = useState(0);
+  const [player1GameOver, setPlayer1GameOver] = useState(false);
+  const [player2GameOver, setPlayer2GameOver] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  // Effect to start playing after countdown finishes
+  useEffect(() => {
+    if (countdown === null && !showModeSelect && !showCoopSettings) {
+      setIsPlaying(true);
+    } else {
+      setIsPlaying(false);
+    }
+  }, [countdown, showModeSelect, showCoopSettings]);
+
   // Render the game based on the selected mode
   return (
     <div style={{ 
@@ -360,35 +378,19 @@ function App() {
           {/* Player 1 game board */}
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
             <h2 style={{ color: "#4f46e5", marginBottom: "1rem" }}>Player 1</h2>
-            <div style={{ 
-              width: "300px", 
-              height: "600px", 
-              backgroundColor: "#1f2937", 
-              border: "2px solid #4f46e5",
-              display: "grid",
-              gridTemplateColumns: "repeat(10, 1fr)",
-              gridTemplateRows: "repeat(20, 1fr)",
-              gap: "1px",
-              padding: "2px"
-            }}>
-              {/* Grid cells with Tetris pieces */}
-              {player1Board.flat().map((cell, i) => {
-                const x = i % 10;
-                const y = Math.floor(i / 10);
-                return (
-                  <div 
-                    key={i} 
-                    style={{ 
-                      backgroundColor: cell ? TETROMINO_COLORS[cell] : "#374151",
-                      boxShadow: cell ? "inset 0 0 5px rgba(255,255,255,0.5)" : "none",
-                      borderRadius: cell ? "2px" : "0"
-                    }}
-                  />
-                );
-              })}
-            </div>
+            <GameBoard 
+              player={1}
+              isGameOver={player1GameOver}
+              setGameOver={setPlayer1GameOver}
+              setScore={setPlayer1Score}
+              isPlaying={isPlaying}
+              width={300}
+              height={600}
+              boardWidth={BOARD_WIDTH}
+              boardHeight={BOARD_HEIGHT}
+            />
             <div style={{ marginTop: "1rem" }}>
-              <p>Score: 0</p>
+              <p>Score: {player1Score}</p>
               <p style={{ fontSize: "0.8rem", color: "#9ca3af" }}>Controls: W,A,S,D + Q,E</p>
             </div>
           </div>
@@ -396,35 +398,19 @@ function App() {
           {/* Player 2 game board */}
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
             <h2 style={{ color: "#ef4444", marginBottom: "1rem" }}>Player 2</h2>
-            <div style={{ 
-              width: "300px", 
-              height: "600px", 
-              backgroundColor: "#1f2937", 
-              border: "2px solid #ef4444",
-              display: "grid",
-              gridTemplateColumns: "repeat(10, 1fr)",
-              gridTemplateRows: "repeat(20, 1fr)",
-              gap: "1px",
-              padding: "2px"
-            }}>
-              {/* Grid cells with Tetris pieces */}
-              {player2Board.flat().map((cell, i) => {
-                const x = i % 10;
-                const y = Math.floor(i / 10);
-                return (
-                  <div 
-                    key={i} 
-                    style={{ 
-                      backgroundColor: cell ? TETROMINO_COLORS[cell] : "#374151",
-                      boxShadow: cell ? "inset 0 0 5px rgba(255,255,255,0.5)" : "none",
-                      borderRadius: cell ? "2px" : "0"
-                    }}
-                  />
-                );
-              })}
-            </div>
+            <GameBoard 
+              player={2}
+              isGameOver={player2GameOver}
+              setGameOver={setPlayer2GameOver}
+              setScore={setPlayer2Score}
+              isPlaying={isPlaying}
+              width={300}
+              height={600}
+              boardWidth={BOARD_WIDTH}
+              boardHeight={BOARD_HEIGHT}
+            />
             <div style={{ marginTop: "1rem" }}>
-              <p>Score: 0</p>
+              <p>Score: {player2Score}</p>
               <p style={{ fontSize: "0.8rem", color: "#9ca3af" }}>Controls: ↑,←,↓,→ + .,/</p>
             </div>
           </div>
@@ -433,33 +419,15 @@ function App() {
         // Co-op mode with a single, larger board
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
           <h2 style={{ color: "#059669", marginBottom: "1rem" }}>Cooperative Mode</h2>
-          <div style={{ 
-            width: "400px", 
-            height: "600px", 
-            backgroundColor: "#1f2937", 
-            border: "2px solid #059669",
-            display: "grid",
-            gridTemplateColumns: "repeat(14, 1fr)",
-            gridTemplateRows: "repeat(24, 1fr)",
-            gap: "1px",
-            padding: "2px"
-          }}>
-            {/* Grid cells with Tetris pieces for co-op mode */}
-            {coopBoard.flat().map((cell, i) => {
-              const x = i % 14;
-              const y = Math.floor(i / 14);
-              return (
-                <div 
-                  key={i} 
-                  style={{ 
-                    backgroundColor: cell ? TETROMINO_COLORS[cell] : "#374151",
-                    boxShadow: cell ? "inset 0 0 5px rgba(255,255,255,0.5)" : "none",
-                    borderRadius: cell ? "2px" : "0"
-                  }}
-                />
-              );
-            })}
-          </div>
+          <CoopGameBoard 
+            width={400}
+            height={600}
+            boardWidth={14}
+            boardHeight={24}
+            isPlaying={isPlaying}
+            score={score}
+            setScore={setScore}
+          />
           <div style={{ marginTop: "1rem", textAlign: "center" }}>
             <div style={{ display: "flex", alignItems: "center", flexDirection: "column", gap: "0.5rem" }}>
               <p>Team Score: <span className="score-change" style={{ color: "#10b981", fontWeight: "bold" }}>{score}</span></p>
@@ -512,16 +480,17 @@ function App() {
         gap: "1rem"
       }}>
         <button 
+          onClick={toggleMute}
           style={{ 
             cursor: "pointer", 
             padding: "0.5rem 1rem",
-            backgroundColor: "#2a3145",
+            backgroundColor: isMuted ? "#ef4444" : "#059669",
             border: "none",
             borderRadius: "4px",
             color: "white"
           }}
         >
-          Sound: ON
+          Sound: {isMuted ? "OFF" : "ON"}
         </button>
         
         <button 

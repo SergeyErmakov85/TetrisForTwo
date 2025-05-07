@@ -1,244 +1,230 @@
-import { useRef, useState, useEffect, useCallback } from "react";
-import { useFrame } from "@react-three/fiber";
-import { useKeyboardControls } from "@react-three/drei";
-import * as THREE from "three";
-import Piece from "./Piece";
-import { useTetris } from "../hooks/useTetris";
-import { 
-  BOARD_WIDTH, 
-  BOARD_HEIGHT, 
-  PLAYER_CONTROLS,
-  TETROMINO_COLORS
-} from "../lib/constants";
-import { useAudio } from "../lib/stores/useAudio";
+import React, { useEffect, useState, useRef } from 'react';
+import { useTetris } from '../hooks/useTetris';
+import { TETROMINO_COLORS, PLAYER_CONTROLS, TetrominoType } from '../lib/constants';
+import { useAudio } from '../lib/stores/useAudio';
 
 interface GameBoardProps {
   player: 1 | 2;
-  position: [number, number, number];
+  position?: [number, number, number]; // Used for 3D positioning (not used in 2D mode)
   isGameOver: boolean;
   setGameOver: (value: boolean) => void;
   setScore: (value: number) => void;
   isPlaying: boolean;
+  width: number;
+  height: number;
+  boardWidth: number;
+  boardHeight: number;
 }
 
-const GameBoard = ({ 
-  player, 
-  position, 
-  isGameOver, 
-  setGameOver, 
+const GameBoard: React.FC<GameBoardProps> = ({
+  player,
+  isGameOver,
+  setGameOver,
   setScore,
-  isPlaying
-}: GameBoardProps) => {
-  const boardRef = useRef<THREE.Group>(null);
-  const { 
-    board, 
-    activePiece, 
+  isPlaying,
+  width,
+  height,
+  boardWidth,
+  boardHeight
+}) => {
+  // Initialize Tetris game logic
+  const {
+    board,
+    activePiece,
     nextPiece,
+    score,
+    gameOver,
     movePiece,
     rotatePiece,
     hardDrop,
-    score,
-    gameOver,
     reset
   } = useTetris(player);
   
-  const { playHit, playSuccess } = useAudio();
-  const [lastMoveTime, setLastMoveTime] = useState(0);
-  const [dropInterval, setDropInterval] = useState(1000); // 1 second per drop
-  const [lastSuccessfulDrop, setLastSuccessfulDrop] = useState(0);
+  const { playHit } = useAudio();
+  const lastKeyPressTime = useRef<{[key: string]: number}>({});
+  const keyRepeatDelay = 100; // ms delay before repeating a key press
+  const gameLoopRef = useRef<number | null>(null);
+  const lastDropTime = useRef<number>(Date.now());
+  const dropInterval = useRef<number>(1000); // Start with 1 second between drops
   
-  // Get player-specific controls based on player number
-  const controlMapping = PLAYER_CONTROLS[player];
-  
-  // Get keyboard state without causing rerenders
-  const moveLeft = useKeyboardControls(state => state[controlMapping.moveLeft]);
-  const moveRight = useKeyboardControls(state => state[controlMapping.moveRight]);
-  const moveDown = useKeyboardControls(state => state[controlMapping.moveDown]);
-  const rotateLeft = useKeyboardControls(state => state[controlMapping.rotateLeft]);
-  const rotateRight = useKeyboardControls(state => state[controlMapping.rotateRight]);
-  const drop = useKeyboardControls(state => state[controlMapping.hardDrop]);
-
-  // Update parent component with game over state
+  // Copy the gameOver state to parent component
   useEffect(() => {
     if (gameOver !== isGameOver) {
       setGameOver(gameOver);
     }
-  }, [gameOver, setGameOver, isGameOver]);
-
-  // Update parent component with score
+  }, [gameOver, isGameOver, setGameOver]);
+  
+  // Update parent score
   useEffect(() => {
     setScore(score);
   }, [score, setScore]);
-
-  // Reset the game when isPlaying changes to true
+  
+  // Reset the game when isPlaying changes
   useEffect(() => {
     if (isPlaying) {
       reset();
     }
   }, [isPlaying, reset]);
-
-  // Process a game frame
-  const processGameFrame = useCallback((currentTime: number) => {
-    if (isGameOver || !isPlaying) return false;
-    
-    // Handle automatic dropping
-    if (currentTime - lastSuccessfulDrop > dropInterval) {
-      const success = movePiece(0, -1);
-      if (success) {
-        setLastSuccessfulDrop(currentTime);
-      }
-    }
-    
-    // Adjust keyboard input rate to prevent too rapid movement
-    if (currentTime - lastMoveTime > 100) { // 100ms rate limit on key presses
-      let moved = false;
-      
-      if (moveLeft) {
-        moved = movePiece(-1, 0);
-        if (moved) playHit();
-      }
-      
-      if (moveRight) {
-        moved = movePiece(1, 0);
-        if (moved) playHit();
-      }
-      
-      if (moveDown) {
-        moved = movePiece(0, -1);
-        if (moved) {
-          // Reset the drop timer when manually moving down
-          setLastSuccessfulDrop(currentTime);
-        }
-      }
-      
-      if (rotateLeft) {
-        moved = rotatePiece('left');
-        if (moved) playHit();
-      }
-      
-      if (rotateRight) {
-        moved = rotatePiece('right');
-        if (moved) playHit();
-      }
-      
-      if (drop) {
-        const linesCleared = hardDrop();
-        if (linesCleared > 0) {
-          playSuccess();
-          
-          // Make the game slightly faster after clearing lines
-          setDropInterval(prev => Math.max(100, prev - 20));
-        }
-      }
-      
-      if (moved) {
-        setLastMoveTime(currentTime);
-        return true;
-      }
-    }
-    
-    return false;
-  }, [isGameOver, isPlaying, lastSuccessfulDrop, dropInterval, lastMoveTime, 
-      moveLeft, moveRight, moveDown, rotateLeft, rotateRight, drop, 
-      movePiece, rotatePiece, hardDrop, playHit, playSuccess]);
-
-  // Handle the automatic dropping of pieces and keyboard input using a reference to avoid too many render calls
-  const lastFrameTimeRef = useRef(Date.now());
   
-  useFrame(() => {
-    const currentTime = Date.now();
-    // Only process a frame every 16ms (approximately 60fps)
-    if (currentTime - lastFrameTimeRef.current >= 16) {
-      processGameFrame(currentTime);
-      lastFrameTimeRef.current = currentTime;
+  // Handle keyboard input
+  useEffect(() => {
+    if (!isPlaying || isGameOver) return;
+    
+    // Get the controls for this player
+    const controls = PLAYER_CONTROLS[player];
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const now = Date.now();
+      // Don't process repeated keys too quickly (except for hard drop)
+      if (
+        lastKeyPressTime.current[e.code] && 
+        now - lastKeyPressTime.current[e.code] < keyRepeatDelay &&
+        !isControlKey(e.code, controls.hardDrop)
+      ) {
+        return;
+      }
+      
+      lastKeyPressTime.current[e.code] = now;
+      
+      // Check which control was pressed
+      if (isControlKey(e.code, controls.moveLeft)) {
+        if (movePiece(-1, 0)) playHit();
+      } else if (isControlKey(e.code, controls.moveRight)) {
+        if (movePiece(1, 0)) playHit();
+      } else if (isControlKey(e.code, controls.moveDown)) {
+        if (movePiece(0, -1)) playHit();
+      } else if (isControlKey(e.code, controls.rotateLeft)) {
+        if (rotatePiece('left')) playHit();
+      } else if (isControlKey(e.code, controls.rotateRight)) {
+        if (rotatePiece('right')) playHit();
+      } else if (isControlKey(e.code, controls.hardDrop)) {
+        hardDrop();
+        playHit();
+      }
+    };
+    
+    const handleKeyUp = (e: KeyboardEvent) => {
+      // Reset the key press time when key is released
+      delete lastKeyPressTime.current[e.code];
+    };
+    
+    // Helper to check if a key matches a control
+    function isControlKey(keyCode: string, controlName: string): boolean {
+      // Map control names to their key codes
+      const controlMap: Record<string, string[]> = {
+        'player1MoveLeft': ['KeyA'],
+        'player1MoveRight': ['KeyD'],
+        'player1MoveDown': ['KeyS'],
+        'player1RotateLeft': ['KeyQ'],
+        'player1RotateRight': ['KeyE'],
+        'player1HardDrop': ['KeyW'],
+        'player2MoveLeft': ['ArrowLeft'],
+        'player2MoveRight': ['ArrowRight'],
+        'player2MoveDown': ['ArrowDown'],
+        'player2RotateLeft': ['Period'],
+        'player2RotateRight': ['Slash'],
+        'player2HardDrop': ['ArrowUp']
+      };
+      
+      return controlMap[controlName]?.includes(keyCode) || false;
     }
-  });
-
+    
+    // Add event listeners
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    
+    // Clean up event listeners on unmount
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [isPlaying, isGameOver, player, movePiece, rotatePiece, hardDrop, playHit]);
+  
+  // Game loop - auto-drop pieces
+  useEffect(() => {
+    if (!isPlaying || isGameOver) {
+      if (gameLoopRef.current) {
+        cancelAnimationFrame(gameLoopRef.current);
+        gameLoopRef.current = null;
+      }
+      return;
+    }
+    
+    const gameLoop = () => {
+      const now = Date.now();
+      
+      // Auto-drop the active piece
+      if (now - lastDropTime.current > dropInterval.current) {
+        movePiece(0, -1);
+        lastDropTime.current = now;
+        
+        // Gradually increase the drop speed as score increases
+        dropInterval.current = Math.max(100, 1000 - Math.floor(score / 500) * 100);
+      }
+      
+      gameLoopRef.current = requestAnimationFrame(gameLoop);
+    };
+    
+    gameLoopRef.current = requestAnimationFrame(gameLoop);
+    
+    // Clean up the game loop
+    return () => {
+      if (gameLoopRef.current) {
+        cancelAnimationFrame(gameLoopRef.current);
+        gameLoopRef.current = null;
+      }
+    };
+  }, [isPlaying, isGameOver, movePiece, score]);
+  
+  // Render the combined state - board with active piece overlaid
+  const combinedBoard = board.map(row => [...row]);
+  
+  // Overlay the active piece on the board
+  if (activePiece) {
+    activePiece.shape.forEach((row, y) => {
+      row.forEach((cell, x) => {
+        if (cell) {
+          const boardY = y + activePiece.position.y;
+          const boardX = x + activePiece.position.x;
+          if (
+            boardY >= 0 && 
+            boardY < boardHeight && 
+            boardX >= 0 && 
+            boardX < boardWidth
+          ) {
+            combinedBoard[boardY][boardX] = activePiece.type;
+          }
+        }
+      });
+    });
+  }
+  
   return (
-    <group ref={boardRef} position={position}>
-      {/* Game board background */}
-      <mesh position={[0, 0, -0.1]} receiveShadow>
-        <planeGeometry args={[BOARD_WIDTH + 0.2, BOARD_HEIGHT + 0.2]} />
-        <meshStandardMaterial color="#1f2937" />
-      </mesh>
-      
-      {/* Board grid lines for visual clarity */}
-      {Array.from({ length: BOARD_WIDTH + 1 }).map((_, i) => (
-        <mesh key={`vline-${i}`} position={[i - BOARD_WIDTH / 2, 0, 0]}>
-          <boxGeometry args={[0.02, BOARD_HEIGHT, 0.01]} />
-          <meshStandardMaterial color="#4b5563" transparent opacity={0.3} />
-        </mesh>
+    <div 
+      style={{ 
+        width: `${width}px`, 
+        height: `${height}px`, 
+        backgroundColor: "#1f2937", 
+        border: `2px solid ${player === 1 ? "#4f46e5" : "#ef4444"}`,
+        display: "grid",
+        gridTemplateColumns: `repeat(${boardWidth}, 1fr)`,
+        gridTemplateRows: `repeat(${boardHeight}, 1fr)`,
+        gap: "1px",
+        padding: "2px"
+      }}
+    >
+      {/* Render the combined board with active pieces */}
+      {combinedBoard.flat().map((cell, i) => (
+        <div 
+          key={i} 
+          style={{ 
+            backgroundColor: cell ? TETROMINO_COLORS[cell] : "#374151",
+            boxShadow: cell ? "inset 0 0 5px rgba(255,255,255,0.5)" : "none",
+            borderRadius: cell ? "2px" : "0"
+          }}
+        />
       ))}
-      {Array.from({ length: BOARD_HEIGHT + 1 }).map((_, i) => (
-        <mesh key={`hline-${i}`} position={[0, i - BOARD_HEIGHT / 2, 0]}>
-          <boxGeometry args={[BOARD_WIDTH, 0.02, 0.01]} />
-          <meshStandardMaterial color="#4b5563" transparent opacity={0.3} />
-        </mesh>
-      ))}
-      
-      {/* Render the active falling piece */}
-      {activePiece && activePiece.shape.map((row, y) => 
-        row.map((cell, x) => {
-          if (cell) {
-            const worldX = x + activePiece.position.x - BOARD_WIDTH / 2 + 0.5;
-            const worldY = y + activePiece.position.y - BOARD_HEIGHT / 2 + 0.5;
-            return (
-              <Piece 
-                key={`active-${x}-${y}`} 
-                position={[worldX, worldY, 0]}
-                color={TETROMINO_COLORS[activePiece.type]}
-              />
-            );
-          }
-          return null;
-        })
-      )}
-      
-      {/* Render the static board pieces */}
-      {board.map((row, y) => 
-        row.map((cell, x) => {
-          if (cell) {
-            const worldX = x - BOARD_WIDTH / 2 + 0.5;
-            const worldY = y - BOARD_HEIGHT / 2 + 0.5;
-            return (
-              <Piece 
-                key={`board-${x}-${y}`} 
-                position={[worldX, worldY, 0]}
-                color={TETROMINO_COLORS[cell]}
-              />
-            );
-          }
-          return null;
-        })
-      )}
-      
-      {/* Next piece preview (top right of the board) */}
-      <group position={[0, BOARD_HEIGHT / 2 + 2, 0]}>
-        {nextPiece && nextPiece.shape.map((row, y) => 
-          row.map((cell, x) => {
-            if (cell) {
-              return (
-                <Piece 
-                  key={`next-${x}-${y}`} 
-                  position={[x - 1.5, -y - 0.5, 0]}
-                  color={TETROMINO_COLORS[nextPiece.type]}
-                  scale={0.8}
-                />
-              );
-            }
-            return null;
-          })
-        )}
-      </group>
-      
-      {/* Game Over Overlay */}
-      {isGameOver && (
-        <mesh position={[0, 0, 0.5]}>
-          <planeGeometry args={[BOARD_WIDTH, BOARD_HEIGHT]} />
-          <meshBasicMaterial color="#000000" transparent opacity={0.7} />
-        </mesh>
-      )}
-    </group>
+    </div>
   );
 };
 
