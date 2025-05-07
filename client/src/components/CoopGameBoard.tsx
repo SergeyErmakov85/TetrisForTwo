@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { TETROMINO_COLORS, KEYBOARD_CONTROLS } from '../lib/constants';
+import { TETROMINO_COLORS, KEYBOARD_CONTROLS, TETROMINOES } from '../lib/constants';
 import { useAudio } from '../lib/stores/useAudio';
 import { useGame } from '../lib/stores/useGame';
 
@@ -40,12 +40,14 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
   // Player 1 piece
   const [player1Piece, setPlayer1Piece] = React.useState<{
     type: TetrominoType;
+    shape: number[][];
     position: { x: number; y: number };
   } | null>(null);
   
   // Player 2 piece
   const [player2Piece, setPlayer2Piece] = React.useState<{
     type: TetrominoType;
+    shape: number[][];
     position: { x: number; y: number };
   } | null>(null);
   
@@ -77,12 +79,14 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
     // Player 1 piece (left side)
     setPlayer1Piece({
       type: type1,
+      shape: TETROMINOES[type1],
       position: { x: Math.floor(boardWidth / 4), y: 0 }
     });
     
     // Player 2 piece (right side)
     setPlayer2Piece({
       type: type2,
+      shape: TETROMINOES[type2],
       position: { x: Math.floor(boardWidth * 3 / 4), y: 0 }
     });
   };
@@ -97,19 +101,45 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
       y: piece.position.y + dy
     };
     
-    // Check board boundaries
-    if (
-      newPosition.x < 0 || 
-      newPosition.x >= boardWidth || 
-      newPosition.y < 0 || 
-      newPosition.y >= boardHeight
-    ) {
-      return false;
-    }
-    
-    // Check collision with existing pieces on the board
-    if (board[newPosition.y][newPosition.x] !== null) {
-      return false;
+    // Check if any part of the piece would be out of bounds or colliding with existing pieces
+    for (let y = 0; y < piece.shape.length; y++) {
+      for (let x = 0; x < piece.shape[y].length; x++) {
+        if (piece.shape[y][x]) {
+          const boardX = newPosition.x + x;
+          const boardY = newPosition.y + y;
+          
+          // Check boundaries
+          if (
+            boardX < 0 || 
+            boardX >= boardWidth || 
+            boardY < 0 || 
+            boardY >= boardHeight
+          ) {
+            return false;
+          }
+          
+          // Check collision with existing pieces on the board
+          if (boardY < boardHeight && board[boardY][boardX] !== null) {
+            return false;
+          }
+          
+          // Check collision with other player's piece
+          const otherPiece = player === 1 ? player2Piece : player1Piece;
+          if (otherPiece) {
+            for (let oy = 0; oy < otherPiece.shape.length; oy++) {
+              for (let ox = 0; ox < otherPiece.shape[oy].length; ox++) {
+                if (
+                  otherPiece.shape[oy][ox] && 
+                  boardX === otherPiece.position.x + ox && 
+                  boardY === otherPiece.position.y + oy
+                ) {
+                  return false;
+                }
+              }
+            }
+          }
+        }
+      }
     }
     
     // Update piece position
@@ -133,9 +163,29 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
     const piece = player === 1 ? player1Piece : player2Piece;
     if (!piece) return;
     
-    // Update board
+    // Update board with all cells of the tetromino
     const newBoard = [...board];
-    newBoard[piece.position.y][piece.position.x] = piece.type;
+    
+    // Place each cell of the tetromino on the board
+    piece.shape.forEach((row, rowIndex) => {
+      row.forEach((cell, colIndex) => {
+        if (cell) {
+          const boardY = piece.position.y + rowIndex;
+          const boardX = piece.position.x + colIndex;
+          
+          // Only place cells that are within the board
+          if (
+            boardY >= 0 && 
+            boardY < boardHeight && 
+            boardX >= 0 && 
+            boardX < boardWidth
+          ) {
+            newBoard[boardY][boardX] = piece.type;
+          }
+        }
+      });
+    });
+    
     setBoard(newBoard);
     
     // Update score
@@ -162,6 +212,7 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
       
       setPlayer1Piece({
         type: newType,
+        shape: TETROMINOES[newType],
         position: { x: Math.floor(boardWidth / 4), y: 0 }
       });
     } else {
@@ -175,6 +226,7 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
       
       setPlayer2Piece({
         type: newType,
+        shape: TETROMINOES[newType],
         position: { x: Math.floor(boardWidth * 3 / 4), y: 0 }
       });
     }
@@ -285,28 +337,48 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
           
           // Check if this position contains player 1's piece
           let isPlayer1Piece = false;
-          if (player1Piece && 
-              x === player1Piece.position.x && 
-              y === player1Piece.position.y) {
-            isPlayer1Piece = true;
+          let player1Type: TetrominoType | null = null;
+          
+          if (player1Piece) {
+            // Check each cell of the tetromino shape
+            player1Piece.shape.forEach((row, rowIndex) => {
+              row.forEach((cell, colIndex) => {
+                if (cell && 
+                    x === player1Piece.position.x + colIndex && 
+                    y === player1Piece.position.y + rowIndex) {
+                  isPlayer1Piece = true;
+                  player1Type = player1Piece.type;
+                }
+              });
+            });
           }
           
           // Check if this position contains player 2's piece
           let isPlayer2Piece = false;
-          if (player2Piece && 
-              x === player2Piece.position.x && 
-              y === player2Piece.position.y) {
-            isPlayer2Piece = true;
+          let player2Type: TetrominoType | null = null;
+          
+          if (player2Piece) {
+            // Check each cell of the tetromino shape
+            player2Piece.shape.forEach((row, rowIndex) => {
+              row.forEach((cell, colIndex) => {
+                if (cell && 
+                    x === player2Piece.position.x + colIndex && 
+                    y === player2Piece.position.y + rowIndex) {
+                  isPlayer2Piece = true;
+                  player2Type = player2Piece.type;
+                }
+              });
+            });
           }
           
           // Determine cell color
           let cellColor = '#374151'; // Empty cell
           if (cell) {
             cellColor = TETROMINO_COLORS[cell]; // Placed piece
-          } else if (isPlayer1Piece) {
-            cellColor = '#4f46e5'; // Player 1 piece
-          } else if (isPlayer2Piece) {
-            cellColor = '#ef4444'; // Player 2 piece
+          } else if (isPlayer1Piece && player1Type) {
+            cellColor = TETROMINO_COLORS[player1Type]; // Player 1 piece with correct tetromino color
+          } else if (isPlayer2Piece && player2Type) {
+            cellColor = TETROMINO_COLORS[player2Type]; // Player 2 piece with correct tetromino color
           }
           
           return (
