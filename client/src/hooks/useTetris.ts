@@ -113,9 +113,27 @@ export const useTetris = (player: 1 | 2): TetrisHook => {
 
   // Initialize the game on first render
   useEffect(() => {
-    reset();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    // Set the initial state directly for player to avoid infinite loops
+    const emptyBoard = generateEmptyBoard();
+    setBoard(emptyBoard);
+    boardRef.current = emptyBoard;
+    
+    setActivePiece(null);
+    activePieceRef.current = null;
+    
+    setNextPiece(getRandomTetromino());
+    setScore(0);
+    
+    setGameOver(false);
+    gameOverRef.current = false;
+    
+    // Delay spawning the first piece
+    const timer = setTimeout(() => {
+      spawnNewPiece();
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, [player]);
 
   // Move the active piece
   const movePiece = useCallback((dx: number, dy: number): boolean => {

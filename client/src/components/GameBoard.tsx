@@ -142,10 +142,16 @@ const GameBoard = ({
       moveLeft, moveRight, moveDown, rotateLeft, rotateRight, drop, 
       movePiece, rotatePiece, hardDrop, playHit, playSuccess]);
 
-  // Handle the automatic dropping of pieces and keyboard input
+  // Handle the automatic dropping of pieces and keyboard input using a reference to avoid too many render calls
+  const lastFrameTimeRef = useRef(Date.now());
+  
   useFrame(() => {
     const currentTime = Date.now();
-    processGameFrame(currentTime);
+    // Only process a frame every 16ms (approximately 60fps)
+    if (currentTime - lastFrameTimeRef.current >= 16) {
+      processGameFrame(currentTime);
+      lastFrameTimeRef.current = currentTime;
+    }
   });
 
   return (
