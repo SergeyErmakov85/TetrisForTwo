@@ -2,12 +2,24 @@ import React, { useState, useEffect, ChangeEvent } from "react";
 import "@fontsource/inter";
 import { useAudio } from "./lib/stores/useAudio";
 import { useGame, GameMode, GamePhase } from "./lib/stores/useGame";
+import { TETROMINOES, TETROMINO_COLORS, TetrominoType } from "./lib/constants";
 
 // Simple 2D version of the game for testing display
 function App() {
   const { setBackgroundMusic, setHitSound, setSuccessSound, playSuccess } = useAudio();
   const { mode, setMode, scoreLimit, setScoreLimit, phase, end, restart } = useGame();
   const [score, setScore] = useState(0);
+  
+  // For demo: displaying sample Tetris pieces
+  const [player1Board, setPlayer1Board] = useState<(TetrominoType | null)[][]>(
+    Array(20).fill(null).map(() => Array(10).fill(null))
+  );
+  const [player2Board, setPlayer2Board] = useState<(TetrominoType | null)[][]>(
+    Array(20).fill(null).map(() => Array(10).fill(null))
+  );
+  const [coopBoard, setCoopBoard] = useState<(TetrominoType | null)[][]>(
+    Array(24).fill(null).map(() => Array(14).fill(null))
+  );
   const [countdown, setCountdown] = useState<number | null>(3);
   const [showModeSelect, setShowModeSelect] = useState(true);
   const [showCoopSettings, setShowCoopSettings] = useState(false);
@@ -59,6 +71,71 @@ function App() {
     }
   };
   
+  // Create sample tetris pieces for visualization
+  useEffect(() => {
+    if (countdown === null && !showModeSelect && !showCoopSettings) {
+      // Sample pieces for the boards after countdown ends
+      const tetrisTypes: TetrominoType[] = ['I', 'J', 'L', 'O', 'S', 'T', 'Z'];
+      
+      // Create sample pieces for player 1 board
+      const p1Board = Array(20).fill(null).map(() => Array(10).fill(null));
+      // Add some blocks at the bottom for player 1
+      for (let y = 0; y < 4; y++) {
+        for (let x = 0; x < 10; x++) {
+          if (Math.random() > 0.5) {
+            p1Board[19-y][x] = tetrisTypes[Math.floor(Math.random() * tetrisTypes.length)];
+          }
+        }
+      }
+      // Add active piece for player 1 (T shape at top)
+      p1Board[0][4] = 'T';
+      p1Board[1][3] = 'T';
+      p1Board[1][4] = 'T';
+      p1Board[1][5] = 'T';
+      setPlayer1Board(p1Board);
+      
+      // Create sample pieces for player 2 board
+      const p2Board = Array(20).fill(null).map(() => Array(10).fill(null));
+      // Add some blocks at the bottom for player 2
+      for (let y = 0; y < 5; y++) {
+        for (let x = 0; x < 10; x++) {
+          if (Math.random() > 0.4) {
+            p2Board[19-y][x] = tetrisTypes[Math.floor(Math.random() * tetrisTypes.length)];
+          }
+        }
+      }
+      // Add active piece for player 2 (I shape at top)
+      p2Board[0][3] = 'I';
+      p2Board[0][4] = 'I';
+      p2Board[0][5] = 'I';
+      p2Board[0][6] = 'I';
+      setPlayer2Board(p2Board);
+      
+      // Create sample pieces for coop board
+      const cBoard = Array(24).fill(null).map(() => Array(14).fill(null));
+      // Add some blocks at the bottom
+      for (let y = 0; y < 6; y++) {
+        for (let x = 0; x < 14; x++) {
+          if (Math.random() > 0.5) {
+            cBoard[23-y][x] = tetrisTypes[Math.floor(Math.random() * tetrisTypes.length)];
+          }
+        }
+      }
+      // Add player 1 piece (L shape on left)
+      cBoard[5][3] = 'L';
+      cBoard[6][3] = 'L';
+      cBoard[7][3] = 'L';
+      cBoard[7][4] = 'L';
+      
+      // Add player 2 piece (S shape on right)
+      cBoard[4][10] = 'S';
+      cBoard[4][11] = 'S';
+      cBoard[5][9] = 'S';
+      cBoard[5][10] = 'S';
+      setCoopBoard(cBoard);
+    }
+  }, [countdown, showModeSelect, showCoopSettings]);
+
   // Start the game with a countdown
   const startGame = () => {
     setShowModeSelect(false);
@@ -294,10 +371,21 @@ function App() {
               gap: "1px",
               padding: "2px"
             }}>
-              {/* Grid cells */}
-              {Array.from({ length: 200 }).map((_, i) => (
-                <div key={i} style={{ backgroundColor: "#374151" }}></div>
-              ))}
+              {/* Grid cells with Tetris pieces */}
+              {player1Board.flat().map((cell, i) => {
+                const x = i % 10;
+                const y = Math.floor(i / 10);
+                return (
+                  <div 
+                    key={i} 
+                    style={{ 
+                      backgroundColor: cell ? TETROMINO_COLORS[cell] : "#374151",
+                      boxShadow: cell ? "inset 0 0 5px rgba(255,255,255,0.5)" : "none",
+                      borderRadius: cell ? "2px" : "0"
+                    }}
+                  />
+                );
+              })}
             </div>
             <div style={{ marginTop: "1rem" }}>
               <p>Score: 0</p>
@@ -319,10 +407,21 @@ function App() {
               gap: "1px",
               padding: "2px"
             }}>
-              {/* Grid cells */}
-              {Array.from({ length: 200 }).map((_, i) => (
-                <div key={i} style={{ backgroundColor: "#374151" }}></div>
-              ))}
+              {/* Grid cells with Tetris pieces */}
+              {player2Board.flat().map((cell, i) => {
+                const x = i % 10;
+                const y = Math.floor(i / 10);
+                return (
+                  <div 
+                    key={i} 
+                    style={{ 
+                      backgroundColor: cell ? TETROMINO_COLORS[cell] : "#374151",
+                      boxShadow: cell ? "inset 0 0 5px rgba(255,255,255,0.5)" : "none",
+                      borderRadius: cell ? "2px" : "0"
+                    }}
+                  />
+                );
+              })}
             </div>
             <div style={{ marginTop: "1rem" }}>
               <p>Score: 0</p>
@@ -345,10 +444,21 @@ function App() {
             gap: "1px",
             padding: "2px"
           }}>
-            {/* Grid cells for co-op mode (larger grid) */}
-            {Array.from({ length: 336 }).map((_, i) => (
-              <div key={i} style={{ backgroundColor: "#374151" }}></div>
-            ))}
+            {/* Grid cells with Tetris pieces for co-op mode */}
+            {coopBoard.flat().map((cell, i) => {
+              const x = i % 14;
+              const y = Math.floor(i / 14);
+              return (
+                <div 
+                  key={i} 
+                  style={{ 
+                    backgroundColor: cell ? TETROMINO_COLORS[cell] : "#374151",
+                    boxShadow: cell ? "inset 0 0 5px rgba(255,255,255,0.5)" : "none",
+                    borderRadius: cell ? "2px" : "0"
+                  }}
+                />
+              );
+            })}
           </div>
           <div style={{ marginTop: "1rem", textAlign: "center" }}>
             <div style={{ display: "flex", alignItems: "center", flexDirection: "column", gap: "0.5rem" }}>
