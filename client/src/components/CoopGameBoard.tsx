@@ -1,8 +1,14 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { useTetris } from '../hooks/useTetris';
-import { TETROMINO_COLORS, PLAYER_CONTROLS, TetrominoType } from '../lib/constants';
+import React, { useEffect, useRef } from 'react';
+import { TETROMINO_COLORS, KEYBOARD_CONTROLS } from '../lib/constants';
 import { useAudio } from '../lib/stores/useAudio';
 import { useGame } from '../lib/stores/useGame';
+
+// Create a dummy board for cooperative play
+const generateEmptyBoard = (width: number, height: number) => 
+  Array(height).fill(null).map(() => Array(width).fill(null));
+
+// Simple Tetromino shape for demonstration
+type TetrominoType = 'I' | 'J' | 'L' | 'O' | 'S' | 'T' | 'Z';
 
 interface CoopGameBoardProps {
   width: number;
@@ -23,314 +29,273 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
   score,
   setScore
 }) => {
-  // We'll use player 1's board as the main game board in co-op mode
-  const tetrisPlayer1 = useTetris(1);
-  const tetrisPlayer2 = useTetris(2);
-  
   const { playHit, playSuccess } = useAudio();
-  const { phase, end, scoreLimit } = useGame();
+  const { scoreLimit, end } = useGame();
   
-  // Track if each player's piece is active
-  const [player1Active, setPlayer1Active] = useState(true);
-  const [player2Active, setPlayer2Active] = useState(true);
+  // Create a board state
+  const [board, setBoard] = React.useState<(TetrominoType | null)[][]>(
+    generateEmptyBoard(boardWidth, boardHeight)
+  );
   
-  // Refs for key input handling
-  const lastKeyPressTime = useRef<{[key: string]: number}>({});
-  const keyRepeatDelay = 100; // ms delay before repeating a key press
+  // Player 1 piece
+  const [player1Piece, setPlayer1Piece] = React.useState<{
+    type: TetrominoType;
+    position: { x: number; y: number };
+  } | null>(null);
   
-  // Game loop refs
-  const gameLoopRef = useRef<number | null>(null);
-  const p1LastDropTime = useRef<number>(Date.now());
-  const p2LastDropTime = useRef<number>(Date.now());
-  const dropInterval = useRef<number>(1000); // Start with 1 second between drops
+  // Player 2 piece
+  const [player2Piece, setPlayer2Piece] = React.useState<{
+    type: TetrominoType;
+    position: { x: number; y: number };
+  } | null>(null);
   
-  // Total score is the sum of both players' scores
-  const totalScore = tetrisPlayer1.score + tetrisPlayer2.score;
-  
-  // Update the parent's score state
-  useEffect(() => {
-    setScore(totalScore);
-    
-    // Check win condition
-    if (totalScore >= scoreLimit && phase !== "ended") {
-      playSuccess();
-      end();
-    }
-  }, [totalScore, setScore, playSuccess, end, scoreLimit, phase]);
-  
-  // Reset both players' games when isPlaying changes
+  // Reset board when isPlaying changes
   useEffect(() => {
     if (isPlaying) {
-      tetrisPlayer1.reset();
-      tetrisPlayer2.reset();
-      setPlayer1Active(true);
-      setPlayer2Active(true);
+      setBoard(generateEmptyBoard(boardWidth, boardHeight));
+      spawnNewPieces();
+      setScore(0);
     }
-  }, [isPlaying, tetrisPlayer1.reset, tetrisPlayer2.reset]);
+  }, [isPlaying, boardWidth, boardHeight, setScore]);
   
-  // Handle game over conditions
-  useEffect(() => {
-    if (tetrisPlayer1.gameOver) {
-      setPlayer1Active(false);
+  // Randomly select a tetromino type
+  const getRandomTetromino = (): TetrominoType => {
+    const types: TetrominoType[] = ['I', 'J', 'L', 'O', 'S', 'T', 'Z'];
+    return types[Math.floor(Math.random() * types.length)];
+  };
+  
+  // Spawn new pieces for both players
+  const spawnNewPieces = () => {
+    // Player 1 piece (left side)
+    setPlayer1Piece({
+      type: getRandomTetromino(),
+      position: { x: Math.floor(boardWidth / 4), y: 0 }
+    });
+    
+    // Player 2 piece (right side)
+    setPlayer2Piece({
+      type: getRandomTetromino(),
+      position: { x: Math.floor(boardWidth * 3 / 4), y: 0 }
+    });
+  };
+  
+  // Move a player's piece
+  const movePiece = (player: 1 | 2, dx: number, dy: number): boolean => {
+    const piece = player === 1 ? player1Piece : player2Piece;
+    if (!piece) return false;
+    
+    const newPosition = {
+      x: piece.position.x + dx,
+      y: piece.position.y + dy
+    };
+    
+    // Check board boundaries
+    if (
+      newPosition.x < 0 || 
+      newPosition.x >= boardWidth || 
+      newPosition.y < 0 || 
+      newPosition.y >= boardHeight
+    ) {
+      return false;
     }
     
-    if (tetrisPlayer2.gameOver) {
-      setPlayer2Active(false);
+    // Check collision with existing pieces on the board
+    if (board[newPosition.y][newPosition.x] !== null) {
+      return false;
     }
     
-    // If both players are game over, end the game
-    if (tetrisPlayer1.gameOver && tetrisPlayer2.gameOver && phase !== "ended") {
+    // Update piece position
+    if (player === 1) {
+      setPlayer1Piece({
+        ...piece,
+        position: newPosition
+      });
+    } else {
+      setPlayer2Piece({
+        ...piece,
+        position: newPosition
+      });
+    }
+    
+    return true;
+  };
+  
+  // Place a piece on the board permanently
+  const placePiece = (player: 1 | 2) => {
+    const piece = player === 1 ? player1Piece : player2Piece;
+    if (!piece) return;
+    
+    // Update board
+    const newBoard = [...board];
+    newBoard[piece.position.y][piece.position.x] = piece.type;
+    setBoard(newBoard);
+    
+    // Update score
+    const newScore = score + 100;
+    setScore(newScore);
+    playSuccess();
+    
+    // Check win condition
+    if (newScore >= scoreLimit) {
       end();
     }
-  }, [tetrisPlayer1.gameOver, tetrisPlayer2.gameOver, end, phase]);
+    
+    // Spawn new piece for the player
+    if (player === 1) {
+      setPlayer1Piece({
+        type: getRandomTetromino(),
+        position: { x: Math.floor(boardWidth / 4), y: 0 }
+      });
+    } else {
+      setPlayer2Piece({
+        type: getRandomTetromino(),
+        position: { x: Math.floor(boardWidth * 3 / 4), y: 0 }
+      });
+    }
+  };
   
-  // Handle keyboard input
+  // Keyboard controls
   useEffect(() => {
     if (!isPlaying) return;
     
-    const p1Controls = PLAYER_CONTROLS[1];
-    const p2Controls = PLAYER_CONTROLS[2];
+    const player1Controls = KEYBOARD_CONTROLS.player1;
+    const player2Controls = KEYBOARD_CONTROLS.player2;
     
     const handleKeyDown = (e: KeyboardEvent) => {
-      const now = Date.now();
-      
-      // Don't process repeated keys too quickly (except for hard drop)
-      if (
-        lastKeyPressTime.current[e.code] && 
-        now - lastKeyPressTime.current[e.code] < keyRepeatDelay &&
-        !isControlKey(e.code, p1Controls.hardDrop) && 
-        !isControlKey(e.code, p2Controls.hardDrop)
-      ) {
-        return;
-      }
-      
-      lastKeyPressTime.current[e.code] = now;
-      
       // Player 1 controls
-      if (player1Active) {
-        if (isControlKey(e.code, p1Controls.moveLeft)) {
-          if (tetrisPlayer1.movePiece(-1, 0)) playHit();
-        } else if (isControlKey(e.code, p1Controls.moveRight)) {
-          if (tetrisPlayer1.movePiece(1, 0)) playHit();
-        } else if (isControlKey(e.code, p1Controls.moveDown)) {
-          if (tetrisPlayer1.movePiece(0, -1)) playHit();
-        } else if (isControlKey(e.code, p1Controls.rotateLeft)) {
-          if (tetrisPlayer1.rotatePiece('left')) playHit();
-        } else if (isControlKey(e.code, p1Controls.rotateRight)) {
-          if (tetrisPlayer1.rotatePiece('right')) playHit();
-        } else if (isControlKey(e.code, p1Controls.hardDrop)) {
-          tetrisPlayer1.hardDrop();
-          playHit();
-        }
+      if (player1Controls.moveLeft.includes(e.code)) {
+        movePiece(1, -1, 0) && playHit();
+      } else if (player1Controls.moveRight.includes(e.code)) {
+        movePiece(1, 1, 0) && playHit();
+      } else if (player1Controls.moveDown.includes(e.code)) {
+        movePiece(1, 0, 1) && playHit();
+      } else if (player1Controls.hardDrop.includes(e.code)) {
+        placePiece(1);
       }
       
       // Player 2 controls
-      if (player2Active) {
-        if (isControlKey(e.code, p2Controls.moveLeft)) {
-          if (tetrisPlayer2.movePiece(-1, 0)) playHit();
-        } else if (isControlKey(e.code, p2Controls.moveRight)) {
-          if (tetrisPlayer2.movePiece(1, 0)) playHit();
-        } else if (isControlKey(e.code, p2Controls.moveDown)) {
-          if (tetrisPlayer2.movePiece(0, -1)) playHit();
-        } else if (isControlKey(e.code, p2Controls.rotateLeft)) {
-          if (tetrisPlayer2.rotatePiece('left')) playHit();
-        } else if (isControlKey(e.code, p2Controls.rotateRight)) {
-          if (tetrisPlayer2.rotatePiece('right')) playHit();
-        } else if (isControlKey(e.code, p2Controls.hardDrop)) {
-          tetrisPlayer2.hardDrop();
-          playHit();
-        }
+      if (player2Controls.moveLeft.includes(e.code)) {
+        movePiece(2, -1, 0) && playHit();
+      } else if (player2Controls.moveRight.includes(e.code)) {
+        movePiece(2, 1, 0) && playHit();
+      } else if (player2Controls.moveDown.includes(e.code)) {
+        movePiece(2, 0, 1) && playHit();
+      } else if (player2Controls.hardDrop.includes(e.code)) {
+        placePiece(2);
       }
     };
     
-    const handleKeyUp = (e: KeyboardEvent) => {
-      // Reset the key press time when key is released
-      delete lastKeyPressTime.current[e.code];
-    };
-    
-    // Helper to check if a key matches a control
-    function isControlKey(keyCode: string, controlName: string): boolean {
-      // Map control names to their key codes
-      const controlMap: Record<string, string[]> = {
-        'player1MoveLeft': ['KeyA'],
-        'player1MoveRight': ['KeyD'],
-        'player1MoveDown': ['KeyS'],
-        'player1RotateLeft': ['KeyQ'],
-        'player1RotateRight': ['KeyE'],
-        'player1HardDrop': ['KeyW'],
-        'player2MoveLeft': ['ArrowLeft'],
-        'player2MoveRight': ['ArrowRight'],
-        'player2MoveDown': ['ArrowDown'],
-        'player2RotateLeft': ['Period'],
-        'player2RotateRight': ['Slash'],
-        'player2HardDrop': ['ArrowUp']
-      };
-      
-      return controlMap[controlName]?.includes(keyCode) || false;
-    }
-    
-    // Add event listeners
     window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
     
-    // Clean up event listeners on unmount
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [
-    isPlaying, 
-    player1Active, 
-    player2Active, 
-    tetrisPlayer1.movePiece, 
-    tetrisPlayer1.rotatePiece, 
-    tetrisPlayer1.hardDrop,
-    tetrisPlayer2.movePiece, 
-    tetrisPlayer2.rotatePiece, 
-    tetrisPlayer2.hardDrop,
-    playHit
-  ]);
+  }, [isPlaying, player1Piece, player2Piece, board, playHit, playSuccess, score]);
   
-  // Game loop - auto-drop pieces
+  // Game loop - automatically move pieces down
+  const lastTimeRef = useRef<number>(0);
+  const frameIdRef = useRef<number>(0);
+  
   useEffect(() => {
-    if (!isPlaying) {
-      if (gameLoopRef.current) {
-        cancelAnimationFrame(gameLoopRef.current);
-        gameLoopRef.current = null;
+    if (!isPlaying) return;
+    
+    function gameLoop(timestamp: number) {
+      if (!lastTimeRef.current) {
+        lastTimeRef.current = timestamp;
       }
-      return;
+      
+      const deltaTime = timestamp - lastTimeRef.current;
+      
+      // Move pieces down every 1000ms
+      if (deltaTime > 1000) {
+        // Move player 1 piece down
+        if (player1Piece) {
+          const canMoveDown = movePiece(1, 0, 1);
+          if (!canMoveDown) {
+            placePiece(1);
+          }
+        }
+        
+        // Move player 2 piece down
+        if (player2Piece) {
+          const canMoveDown = movePiece(2, 0, 1);
+          if (!canMoveDown) {
+            placePiece(2);
+          }
+        }
+        
+        lastTimeRef.current = timestamp;
+      }
+      
+      frameIdRef.current = requestAnimationFrame(gameLoop);
     }
     
-    const gameLoop = () => {
-      const now = Date.now();
-      
-      // Update drop interval based on score
-      dropInterval.current = Math.max(100, 1000 - Math.floor(totalScore / 1000) * 100);
-      
-      // Auto-drop player 1's piece
-      if (player1Active && now - p1LastDropTime.current > dropInterval.current) {
-        tetrisPlayer1.movePiece(0, -1);
-        p1LastDropTime.current = now;
-      }
-      
-      // Auto-drop player 2's piece
-      if (player2Active && now - p2LastDropTime.current > dropInterval.current) {
-        tetrisPlayer2.movePiece(0, -1);
-        p2LastDropTime.current = now;
-      }
-      
-      gameLoopRef.current = requestAnimationFrame(gameLoop);
-    };
+    frameIdRef.current = requestAnimationFrame(gameLoop);
     
-    gameLoopRef.current = requestAnimationFrame(gameLoop);
-    
-    // Clean up the game loop
     return () => {
-      if (gameLoopRef.current) {
-        cancelAnimationFrame(gameLoopRef.current);
-        gameLoopRef.current = null;
-      }
+      cancelAnimationFrame(frameIdRef.current);
     };
-  }, [isPlaying, player1Active, player2Active, tetrisPlayer1.movePiece, tetrisPlayer2.movePiece, totalScore]);
-  
-  // Create a combined board from both players' boards
-  // For co-op mode, we'll show both players' pieces on the same board
-  const p1Board = tetrisPlayer1.board;
-  const p2Board = tetrisPlayer2.board;
-  
-  // Start with empty board of the specified size
-  const combinedBoard: (TetrominoType | null)[][] = Array(boardHeight)
-    .fill(null)
-    .map(() => Array(boardWidth).fill(null));
-  
-  // Copy player 1's board to the left side of the combined board
-  p1Board.forEach((row, y) => {
-    row.forEach((cell, x) => {
-      if (cell && y < boardHeight && x < boardWidth) {
-        combinedBoard[y][x] = cell;
-      }
-    });
-  });
-  
-  // Copy player 2's board to the right side of the combined board
-  p2Board.forEach((row, y) => {
-    row.forEach((cell, x) => {
-      // Shift player 2's board to the right
-      const boardX = x + boardWidth - p2Board[0].length;
-      if (cell && y < boardHeight && boardX >= 0 && boardX < boardWidth) {
-        combinedBoard[y][boardX] = cell;
-      }
-    });
-  });
-  
-  // Overlay player 1's active piece on the combined board
-  if (player1Active && tetrisPlayer1.activePiece) {
-    const piece = tetrisPlayer1.activePiece;
-    piece.shape.forEach((row, y) => {
-      row.forEach((cell, x) => {
-        if (cell) {
-          const boardY = y + piece.position.y;
-          const boardX = x + piece.position.x;
-          if (
-            boardY >= 0 && 
-            boardY < boardHeight && 
-            boardX >= 0 && 
-            boardX < boardWidth
-          ) {
-            combinedBoard[boardY][boardX] = piece.type;
-          }
-        }
-      });
-    });
-  }
-  
-  // Overlay player 2's active piece on the combined board
-  if (player2Active && tetrisPlayer2.activePiece) {
-    const piece = tetrisPlayer2.activePiece;
-    piece.shape.forEach((row, y) => {
-      row.forEach((cell, x) => {
-        if (cell) {
-          const boardY = y + piece.position.y;
-          // Shift player 2's piece to the right
-          const boardX = x + piece.position.x + boardWidth - p2Board[0].length;
-          if (
-            boardY >= 0 && 
-            boardY < boardHeight && 
-            boardX >= 0 && 
-            boardX < boardWidth
-          ) {
-            combinedBoard[boardY][boardX] = piece.type;
-          }
-        }
-      });
-    });
-  }
+  }, [isPlaying, player1Piece, player2Piece, board]);
   
   return (
-    <div 
-      style={{ 
-        width: `${width}px`, 
-        height: `${height}px`, 
-        backgroundColor: "#1f2937", 
-        border: "2px solid #059669",
-        display: "grid",
-        gridTemplateColumns: `repeat(${boardWidth}, 1fr)`,
-        gridTemplateRows: `repeat(${boardHeight}, 1fr)`,
-        gap: "1px",
-        padding: "2px"
-      }}
-    >
-      {/* Render the combined board with both players' pieces */}
-      {combinedBoard.flat().map((cell, i) => (
-        <div 
-          key={i} 
-          style={{ 
-            backgroundColor: cell ? TETROMINO_COLORS[cell] : "#374151",
-            boxShadow: cell ? "inset 0 0 5px rgba(255,255,255,0.5)" : "none",
-            borderRadius: cell ? "2px" : "0"
-          }}
-        />
-      ))}
+    <div style={{ position: 'relative' }}>
+      {/* Main game board */}
+      <div 
+        style={{ 
+          width: `${width}px`, 
+          height: `${height}px`, 
+          backgroundColor: '#1f2937', 
+          border: '2px solid #059669',
+          display: 'grid',
+          gridTemplateColumns: `repeat(${boardWidth}, 1fr)`,
+          gridTemplateRows: `repeat(${boardHeight}, 1fr)`,
+          gap: '1px',
+          padding: '2px'
+        }}
+      >
+        {board.flat().map((cell, i) => {
+          const x = i % boardWidth;
+          const y = Math.floor(i / boardWidth);
+          
+          // Check if this position contains player 1's piece
+          let isPlayer1Piece = false;
+          if (player1Piece && 
+              x === player1Piece.position.x && 
+              y === player1Piece.position.y) {
+            isPlayer1Piece = true;
+          }
+          
+          // Check if this position contains player 2's piece
+          let isPlayer2Piece = false;
+          if (player2Piece && 
+              x === player2Piece.position.x && 
+              y === player2Piece.position.y) {
+            isPlayer2Piece = true;
+          }
+          
+          // Determine cell color
+          let cellColor = '#374151'; // Empty cell
+          if (cell) {
+            cellColor = TETROMINO_COLORS[cell]; // Placed piece
+          } else if (isPlayer1Piece) {
+            cellColor = '#4f46e5'; // Player 1 piece
+          } else if (isPlayer2Piece) {
+            cellColor = '#ef4444'; // Player 2 piece
+          }
+          
+          return (
+            <div 
+              key={i} 
+              style={{ 
+                backgroundColor: cellColor,
+                boxShadow: (cell || isPlayer1Piece || isPlayer2Piece) ? 
+                  'inset 0 0 5px rgba(255,255,255,0.5)' : 'none',
+                borderRadius: (cell || isPlayer1Piece || isPlayer2Piece) ? '2px' : '0'
+              }}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 };

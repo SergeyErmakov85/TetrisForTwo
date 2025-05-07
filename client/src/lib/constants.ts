@@ -41,6 +41,26 @@ export const PLAYER_CONTROLS = {
   }
 };
 
+// Direct keyboard controls map for easier handling
+export const KEYBOARD_CONTROLS = {
+  player1: {
+    moveLeft: ['KeyA'],
+    moveRight: ['KeyD'],
+    moveDown: ['KeyS'],
+    rotateLeft: ['KeyQ'],
+    rotateRight: ['KeyE'],
+    hardDrop: ['KeyW']
+  },
+  player2: {
+    moveLeft: ['ArrowLeft'],
+    moveRight: ['ArrowRight'],
+    moveDown: ['ArrowDown'],
+    rotateLeft: ['Period'],
+    rotateRight: ['Slash'],
+    hardDrop: ['ArrowUp']
+  }
+};
+
 // Tetromino types
 export type TetrominoType = 'I' | 'J' | 'L' | 'O' | 'S' | 'T' | 'Z';
 

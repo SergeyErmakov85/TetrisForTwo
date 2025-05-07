@@ -1,80 +1,79 @@
-import { BOARD_WIDTH, BOARD_HEIGHT, TETROMINOES, TetrominoType } from './constants';
+import { TETROMINOES, TetrominoType, BOARD_WIDTH, BOARD_HEIGHT } from './constants';
 
-// Generate an empty Tetris board grid
+// Generate an empty board filled with null values
 export function generateEmptyBoard(): (TetrominoType | null)[][] {
-  return Array(BOARD_HEIGHT).fill(null).map(() => 
-    Array(BOARD_WIDTH).fill(null)
-  );
+  return Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null));
 }
 
-// Get a random Tetromino piece
+// Get a random tetromino shape and type
 export function getRandomTetromino() {
-  const tetrominoTypes = Object.keys(TETROMINOES) as TetrominoType[];
-  const randomType = tetrominoTypes[Math.floor(Math.random() * tetrominoTypes.length)];
+  const types: TetrominoType[] = ['I', 'J', 'L', 'O', 'S', 'T', 'Z'];
+  const type = types[Math.floor(Math.random() * types.length)];
+  
   return {
-    shape: TETROMINOES[randomType],
-    type: randomType
+    shape: TETROMINOES[type],
+    type
   };
 }
 
-// Check if a piece collides with the board boundaries or other pieces
+// Check if a piece collides with the board boundaries or placed pieces
 export function checkCollision(
   board: (TetrominoType | null)[][],
-  shape: number[][],
-  offsetX: number,
-  offsetY: number
-): boolean {
-  // Check each cell of the piece
-  for (let y = 0; y < shape.length; y++) {
-    for (let x = 0; x < shape[y].length; x++) {
-      // Only check filled cells
-      if (shape[y][x]) {
-        const boardX = x + offsetX;
-        const boardY = y + offsetY;
-        
-        // Check if out of bounds
-        const isOutOfBounds = 
-          boardX < 0 || 
-          boardX >= BOARD_WIDTH || 
-          boardY < 0 || 
-          boardY >= BOARD_HEIGHT;
-        
-        // Check if there's already a piece at this position
-        const hasCollision = 
-          !isOutOfBounds && 
-          board[boardY][boardX] !== null;
-        
-        if (isOutOfBounds || hasCollision) {
-          return true; // Collision detected
-        }
-      }
-    }
+  piece: {
+    shape: number[][];
+    position: { x: number; y: number };
   }
-  
-  return false; // No collision
+): boolean {
+  return piece.shape.some((row, rowIndex) => {
+    return row.some((value, colIndex) => {
+      // Skip empty cells
+      if (!value) return false;
+      
+      const boardX = piece.position.x + colIndex;
+      const boardY = piece.position.y + rowIndex;
+      
+      // Check board boundaries
+      if (
+        boardX < 0 || 
+        boardX >= BOARD_WIDTH || 
+        boardY < 0 || 
+        boardY >= BOARD_HEIGHT
+      ) {
+        return true; // Out of bounds
+      }
+      
+      // Check collision with existing pieces
+      if (board[boardY][boardX] !== null) {
+        return true; // Collision with placed piece
+      }
+      
+      return false;
+    });
+  });
 }
 
-// Rotate a matrix (for piece rotation)
+// Rotate a matrix (shape) either left or right
 export function rotateMatrix(matrix: number[][], direction: 'left' | 'right'): number[][] {
-  const height = matrix.length;
-  const width = matrix[0].length;
-  const result = Array(width).fill(0).map(() => Array(height).fill(0));
+  const rotated = [];
+  const n = matrix.length;
   
   if (direction === 'right') {
     // Rotate 90 degrees clockwise
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        result[x][height - 1 - y] = matrix[y][x];
+    for (let i = 0; i < n; i++) {
+      rotated.push([]);
+      for (let j = 0; j < n; j++) {
+        rotated[i][j] = matrix[n - j - 1][i];
       }
     }
   } else {
     // Rotate 90 degrees counter-clockwise
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        result[width - 1 - x][y] = matrix[y][x];
+    for (let i = 0; i < n; i++) {
+      rotated.push([]);
+      for (let j = 0; j < n; j++) {
+        rotated[i][j] = matrix[j][n - i - 1];
       }
     }
   }
   
-  return result;
+  return rotated;
 }

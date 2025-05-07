@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useTetris } from '../hooks/useTetris';
-import { TETROMINO_COLORS, PLAYER_CONTROLS } from '../lib/constants';
+import { TETROMINO_COLORS, KEYBOARD_CONTROLS } from '../lib/constants';
 import { useAudio } from '../lib/stores/useAudio';
 
 interface GameBoardProps {
@@ -64,29 +64,25 @@ const GameBoard: React.FC<GameBoardProps> = ({
   useEffect(() => {
     if (!isPlaying || isGameOver) return;
 
-    const controls = PLAYER_CONTROLS[player];
+    const playerKey = player === 1 ? 'player1' : 'player2';
+    const controls = KEYBOARD_CONTROLS[playerKey];
     
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (isControlKey(e.code, 'moveLeft')) {
+      // Player controls based on keyboard input
+      if (controls.moveLeft.includes(e.code)) {
         movePiece(-1, 0) && playHit();
-      } else if (isControlKey(e.code, 'moveRight')) {
+      } else if (controls.moveRight.includes(e.code)) {
         movePiece(1, 0) && playHit();
-      } else if (isControlKey(e.code, 'moveDown')) {
+      } else if (controls.moveDown.includes(e.code)) {
         movePiece(0, 1) && playHit();
-      } else if (isControlKey(e.code, 'rotateLeft')) {
+      } else if (controls.rotateLeft.includes(e.code)) {
         rotatePiece('left') && playHit();
-      } else if (isControlKey(e.code, 'rotateRight')) {
+      } else if (controls.rotateRight.includes(e.code)) {
         rotatePiece('right') && playHit();
-      } else if (isControlKey(e.code, 'hardDrop')) {
+      } else if (controls.hardDrop.includes(e.code)) {
         hardDrop() && playHit();
       }
     };
-    
-    function isControlKey(keyCode: string, controlName: string): boolean {
-      // Find the control name in CONTROLS
-      const controlObj = CONTROLS.find(control => control.name === controls[controlName]);
-      return controlObj ? controlObj.keys.includes(keyCode) : false;
-    }
 
     window.addEventListener('keydown', handleKeyDown);
     

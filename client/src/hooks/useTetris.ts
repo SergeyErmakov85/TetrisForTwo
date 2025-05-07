@@ -1,9 +1,9 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
-import {
+import { useState, useCallback, useEffect } from 'react';
+import { 
+  TETROMINOES, 
+  TetrominoType,
   BOARD_WIDTH,
-  BOARD_HEIGHT,
-  TETROMINOES,
-  TetrominoType
+  BOARD_HEIGHT
 } from '../lib/constants';
 import {
   generateEmptyBoard,
@@ -11,6 +11,17 @@ import {
   checkCollision,
   rotateMatrix
 } from '../lib/tetrisHelpers';
+
+interface ActivePiece {
+  shape: number[][];
+  type: TetrominoType;
+  position: { x: number; y: number };
+}
+
+interface Tetromino {
+  shape: number[][];
+  type: TetrominoType;
+}
 
 interface TetrisHook {
   board: (TetrominoType | null)[][];
@@ -24,258 +35,241 @@ interface TetrisHook {
   reset: () => void;
 }
 
-interface Tetromino {
-  shape: number[][];
-  type: TetrominoType;
-}
-
-interface ActivePiece extends Tetromino {
-  position: { x: number; y: number };
-}
-
 export const useTetris = (player: 1 | 2): TetrisHook => {
-  const [board, setBoard] = useState<(TetrominoType | null)[][]>(generateEmptyBoard());
+  // Core game state
+  const [board, setBoard] = useState<(TetrominoType | null)[][]>(
+    generateEmptyBoard()
+  );
   const [activePiece, setActivePiece] = useState<ActivePiece | null>(null);
   const [nextPiece, setNextPiece] = useState<Tetromino | null>(null);
-  const [score, setScore] = useState<number>(0);
-  const [gameOver, setGameOver] = useState<boolean>(false);
+  const [score, setScore] = useState(0);
+  const [gameOver, setGameOver] = useState(false);
   
-  // Use refs to prevent infinite loops with dependencies
-  const boardRef = useRef(board);
-  const activePieceRef = useRef(activePiece);
-  const gameOverRef = useRef(gameOver);
+  // Initialize game
+  const reset = useCallback(() => {
+    setBoard(generateEmptyBoard());
+    setActivePiece(null);
+    setNextPiece(null);
+    setScore(0);
+    setGameOver(false);
+  }, []);
   
-  // Update refs when state changes
-  useEffect(() => {
-    boardRef.current = board;
-  }, [board]);
-  
-  useEffect(() => {
-    activePieceRef.current = activePiece;
-  }, [activePiece]);
-  
-  useEffect(() => {
-    gameOverRef.current = gameOver;
-  }, [gameOver]);
-
-  // Helper to spawn a new piece
-  const spawnNewPiece = useCallback(() => {
-    if (gameOverRef.current) return;
-
-    // Use the next piece as the active piece or generate a new one if there is no next piece
-    const newActivePiece = nextPiece || getRandomTetromino();
+  // Spawn a new piece
+  const spawnPiece = useCallback(() => {
+    // If there's a next piece, use that, otherwise generate a new one
+    const newPiece = nextPiece || getRandomTetromino();
     
-    // Generate the next piece
-    const newNextPiece = getRandomTetromino();
-    
-    // Position the piece at the top center of the board
-    const newPosition = {
-      x: Math.floor(BOARD_WIDTH / 2) - Math.floor(newActivePiece.shape[0].length / 2),
-      y: BOARD_HEIGHT - 1
+    // Create new active piece
+    const newActivePiece: ActivePiece = {
+      ...newPiece,
+      position: {
+        x: Math.floor((BOARD_WIDTH - newPiece.shape[0].length) / 2),
+        y: 0
+      }
     };
     
-    // Check if the new piece can be placed
-    if (checkCollision(boardRef.current, newActivePiece.shape, newPosition.x, newPosition.y)) {
-      // Game over if the piece can't be placed
-      console.log(`Player ${player} - Game Over!`);
+    // Check if the new piece collides with existing pieces
+    if (checkCollision(board, newActivePiece)) {
+      // Game over - no space for new piece
       setGameOver(true);
-      return;
+      return false;
     }
     
-    setActivePiece({
-      ...newActivePiece,
-      position: newPosition
-    });
+    // Set the new active piece
+    setActivePiece(newActivePiece);
     
-    setNextPiece(newNextPiece);
-  }, [nextPiece, player]);
-
-  // Initialize the game or reset it
-  const reset = useCallback(() => {
-    const emptyBoard = generateEmptyBoard();
-    setBoard(emptyBoard);
-    boardRef.current = emptyBoard;
-    
-    setActivePiece(null);
-    activePieceRef.current = null;
-    
+    // Generate next piece
     setNextPiece(getRandomTetromino());
-    setScore(0);
     
-    setGameOver(false);
-    gameOverRef.current = false;
-    
-    // Delay spawning the first piece
-    setTimeout(() => {
-      spawnNewPiece();
-    }, 50);
-  }, [spawnNewPiece]);
-
-  // Initialize the game on first render
+    return true;
+  }, [board, nextPiece]);
+  
+  // Initialize game
   useEffect(() => {
-    // Set the initial state directly for player to avoid infinite loops
-    const emptyBoard = generateEmptyBoard();
-    setBoard(emptyBoard);
-    boardRef.current = emptyBoard;
-    
-    setActivePiece(null);
-    activePieceRef.current = null;
-    
-    setNextPiece(getRandomTetromino());
-    setScore(0);
-    
-    setGameOver(false);
-    gameOverRef.current = false;
-    
-    // Delay spawning the first piece
-    const timer = setTimeout(() => {
-      spawnNewPiece();
-    }, 100);
-    
-    return () => clearTimeout(timer);
-  }, [player]);
-
-  // Move the active piece
+    if (!activePiece && !gameOver) {
+      spawnPiece();
+    }
+  }, [activePiece, gameOver, spawnPiece]);
+  
+  // Move a piece
   const movePiece = useCallback((dx: number, dy: number): boolean => {
-    if (!activePieceRef.current || gameOverRef.current) return false;
+    if (!activePiece || gameOver) return false;
     
-    const newX = activePieceRef.current.position.x + dx;
-    const newY = activePieceRef.current.position.y + dy;
+    const newPosition = {
+      x: activePiece.position.x + dx,
+      y: activePiece.position.y + dy
+    };
+    
+    const newActivePiece = {
+      ...activePiece,
+      position: newPosition
+    };
     
     // Check if the move is valid
-    if (checkCollision(boardRef.current, activePieceRef.current.shape, newX, newY)) {
-      // If we're trying to move down and hit something, lock the piece
-      if (dy < 0) {
-        // Lock the current piece into the board
-        const newBoard = [...boardRef.current];
-        activePieceRef.current.shape.forEach((row, y) => {
-          row.forEach((cell, x) => {
-            if (cell) {
-              const boardY = y + activePieceRef.current!.position.y;
-              const boardX = x + activePieceRef.current!.position.x;
-              if (boardY >= 0 && boardY < BOARD_HEIGHT && boardX >= 0 && boardX < BOARD_WIDTH) {
-                newBoard[boardY][boardX] = activePieceRef.current!.type;
-              }
-            }
-          });
-        });
-        
-        // Check for completed rows and clear them
-        const completedRows: number[] = [];
-        newBoard.forEach((row, index) => {
-          if (row.every(cell => cell !== null)) {
-            completedRows.push(index);
-          }
-        });
-        
-        // Clear completed rows and update the score
-        if (completedRows.length > 0) {
-          completedRows.forEach(rowIndex => {
-            newBoard.splice(rowIndex, 1);
-            newBoard.push(Array(BOARD_WIDTH).fill(null));
-          });
-          
-          // Update score based on the number of rows cleared
-          // Using standard Tetris scoring: 1 row = 100, 2 rows = 300, 3 rows = 500, 4 rows = 800
-          const points = [0, 100, 300, 500, 800][completedRows.length] || 1000;
-          setScore(prevScore => prevScore + points);
-        }
-        
-        setBoard(newBoard);
-        
-        // Spawn a new piece
-        setTimeout(() => {
-          spawnNewPiece();
-        }, 0);
-        
-        return true;
+    if (checkCollision(board, newActivePiece)) {
+      // If moving down causes collision, place the piece
+      if (dy > 0) {
+        lockPiece();
       }
       return false;
     }
     
-    // Move the piece
-    setActivePiece({
-      ...activePieceRef.current,
-      position: { x: newX, y: newY }
-    });
-    
+    // Update the active piece
+    setActivePiece(newActivePiece);
     return true;
-  }, [spawnNewPiece]);
-
-  // Rotate the active piece
+  }, [activePiece, board, gameOver]);
+  
+  // Rotate a piece
   const rotatePiece = useCallback((direction: 'left' | 'right'): boolean => {
-    if (!activePieceRef.current || gameOverRef.current) return false;
+    if (!activePiece || gameOver) return false;
     
-    // Create a deep copy of the active piece shape
-    const newShape = activePieceRef.current.shape.map(row => [...row]);
+    // Create a rotated shape
+    const rotatedShape = rotateMatrix(activePiece.shape, direction);
     
-    // Rotate the shape
-    const rotatedShape = rotateMatrix(newShape, direction);
+    const newActivePiece = {
+      ...activePiece,
+      shape: rotatedShape
+    };
     
-    // Try standard rotation first
-    if (!checkCollision(boardRef.current, rotatedShape, activePieceRef.current.position.x, activePieceRef.current.position.y)) {
-      setActivePiece({
-        ...activePieceRef.current,
-        shape: rotatedShape
-      });
-      return true;
+    // Check for collision
+    if (checkCollision(board, newActivePiece)) {
+      // If rotation causes collision, try wall kicks
+      const originalX = activePiece.position.x;
+      
+      // Try moving left
+      for (let offset = 1; offset <= 2; offset++) {
+        const testPiece = {
+          ...newActivePiece,
+          position: {
+            ...newActivePiece.position,
+            x: originalX - offset
+          }
+        };
+        
+        if (!checkCollision(board, testPiece)) {
+          setActivePiece(testPiece);
+          return true;
+        }
+      }
+      
+      // Try moving right
+      for (let offset = 1; offset <= 2; offset++) {
+        const testPiece = {
+          ...newActivePiece,
+          position: {
+            ...newActivePiece.position,
+            x: originalX + offset
+          }
+        };
+        
+        if (!checkCollision(board, testPiece)) {
+          setActivePiece(testPiece);
+          return true;
+        }
+      }
+      
+      // If no kick works, rotation fails
+      return false;
     }
     
-    // Wall kick: try shifting left, right, and up
-    const offsets = [
-      { x: -1, y: 0 }, // try shifting left
-      { x: 1, y: 0 },  // try shifting right
-      { x: 0, y: 1 },  // try shifting up
-      { x: -2, y: 0 }, // try shifting two blocks left
-      { x: 2, y: 0 },  // try shifting two blocks right
-    ];
+    // Update the active piece with the rotated shape
+    setActivePiece(newActivePiece);
+    return true;
+  }, [activePiece, board, gameOver]);
+  
+  // Hard drop - move piece all the way down
+  const hardDrop = useCallback((): number => {
+    if (!activePiece || gameOver) return 0;
     
-    for (const offset of offsets) {
-      const newX = activePieceRef.current.position.x + offset.x;
-      const newY = activePieceRef.current.position.y + offset.y;
+    let dropDistance = 0;
+    let canDrop = true;
+    
+    while (canDrop) {
+      const newPosition = {
+        x: activePiece.position.x,
+        y: activePiece.position.y + 1
+      };
       
-      if (!checkCollision(boardRef.current, rotatedShape, newX, newY)) {
-        setActivePiece({
-          ...activePieceRef.current,
-          shape: rotatedShape,
-          position: { x: newX, y: newY }
-        });
-        return true;
+      const newActivePiece = {
+        ...activePiece,
+        position: newPosition
+      };
+      
+      if (checkCollision(board, newActivePiece)) {
+        canDrop = false;
+      } else {
+        setActivePiece(newActivePiece);
+        dropDistance++;
       }
     }
     
-    // Rotation not possible
-    return false;
-  }, []);
-
-  // Hard drop - move the piece all the way down
-  const hardDrop = useCallback((): number => {
-    if (!activePieceRef.current || gameOverRef.current) return 0;
+    // Lock the piece in place
+    lockPiece();
     
-    let dropDistance = 0;
-    let newY = activePieceRef.current.position.y;
+    return dropDistance;
+  }, [activePiece, board, gameOver]);
+  
+  // Lock piece in place and check for completed lines
+  const lockPiece = useCallback(() => {
+    if (!activePiece) return;
     
-    // Find the maximum drop distance
-    while (!checkCollision(boardRef.current, activePieceRef.current.shape, activePieceRef.current.position.x, newY - 1)) {
-      newY--;
-      dropDistance++;
-    }
+    // Create new board with active piece locked in place
+    const newBoard = [...board];
     
-    // Move the piece to the bottom-most valid position
-    setActivePiece({
-      ...activePieceRef.current,
-      position: { ...activePieceRef.current.position, y: newY }
+    activePiece.shape.forEach((row, rowIndex) => {
+      row.forEach((value, colIndex) => {
+        if (value) {
+          const y = activePiece.position.y + rowIndex;
+          const x = activePiece.position.x + colIndex;
+          
+          if (y >= 0 && y < BOARD_HEIGHT && x >= 0 && x < BOARD_WIDTH) {
+            newBoard[y][x] = activePiece.type;
+          }
+        }
+      });
     });
     
-    // Force the piece to lock immediately (after state update)
-    setTimeout(() => {
-      movePiece(0, -1);
-    }, 0);
+    // Check for completed lines
+    let completedLines = 0;
+    const updatedBoard = newBoard.filter(row => {
+      const isRowComplete = row.every(cell => cell !== null);
+      if (isRowComplete) {
+        completedLines++;
+        return false;
+      }
+      return true;
+    });
     
-    // Return lines cleared (for scoring)
-    return dropDistance > 0 ? 1 : 0;
-  }, [movePiece]);
-
+    // Add empty rows at the top
+    while (updatedBoard.length < BOARD_HEIGHT) {
+      updatedBoard.unshift(Array(BOARD_WIDTH).fill(null));
+    }
+    
+    // Update score based on completed lines
+    let additionalScore = 0;
+    switch (completedLines) {
+      case 1:
+        additionalScore = 100;
+        break;
+      case 2:
+        additionalScore = 300;
+        break;
+      case 3:
+        additionalScore = 500;
+        break;
+      case 4:
+        additionalScore = 800; // Tetris!
+        break;
+      default:
+        additionalScore = 0;
+    }
+    
+    // Update game state
+    setBoard(updatedBoard);
+    setActivePiece(null); // Clear active piece to trigger new piece spawn
+    setScore(prevScore => prevScore + additionalScore);
+  }, [activePiece, board]);
+  
   return {
     board,
     activePiece,
