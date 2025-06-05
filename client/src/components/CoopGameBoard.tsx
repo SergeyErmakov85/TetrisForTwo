@@ -70,7 +70,6 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
   const spawnNewPieces = () => {
     // Generate different tetromino types for each player
     const type1 = getRandomTetromino();
-    // Make sure player 2 gets a different type
     let type2;
     do {
       type2 = getRandomTetromino();
@@ -91,8 +90,8 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
     });
   };
 
-  // Check if a piece collides with the board or other pieces
-  const checkCollision = (
+  // Check if a piece would collide at the given position
+  const wouldCollide = (
     piece: {
       shape: number[][];
       position: { x: number; y: number };
@@ -102,35 +101,34 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
       position: { x: number; y: number };
     } | null
   ): boolean => {
-    // Check each cell of the piece
     for (let y = 0; y < piece.shape.length; y++) {
       for (let x = 0; x < piece.shape[y].length; x++) {
         if (piece.shape[y][x]) {
           const boardX = piece.position.x + x;
           const boardY = piece.position.y + y;
-          
+
           // Check boundaries
           if (
-            boardX < 0 || 
-            boardX >= boardWidth || 
-            boardY < 0 || 
+            boardX < 0 ||
+            boardX >= boardWidth ||
+            boardY < 0 ||
             boardY >= boardHeight
           ) {
             return true;
           }
-          
-          // Check collision with placed pieces on the board
+
+          // Check collision with placed pieces
           if (boardY >= 0 && board[boardY][boardX] !== null) {
             return true;
           }
-          
-          // Check collision with other player's piece
+
+          // Check collision with other active piece
           if (otherPiece) {
             for (let oy = 0; oy < otherPiece.shape.length; oy++) {
               for (let ox = 0; ox < otherPiece.shape[oy].length; ox++) {
                 if (
-                  otherPiece.shape[oy][ox] && 
-                  boardX === otherPiece.position.x + ox && 
+                  otherPiece.shape[oy][ox] &&
+                  boardX === otherPiece.position.x + ox &&
                   boardY === otherPiece.position.y + oy
                 ) {
                   return true;
@@ -151,19 +149,16 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
     
     if (!piece) return false;
     
-    const newPosition = {
-      x: piece.position.x + dx,
-      y: piece.position.y + dy
-    };
-    
     const newPiece = {
       ...piece,
-      position: newPosition
+      position: {
+        x: piece.position.x + dx,
+        y: piece.position.y + dy
+      }
     };
     
-    // Check collision with board and other piece
-    if (checkCollision(newPiece, otherPiece)) {
-      // If moving down causes collision, lock the piece
+    // Check if move would cause collision
+    if (wouldCollide(newPiece, otherPiece)) {
       if (dy > 0) {
         placePiece(player);
       }
@@ -185,17 +180,16 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
     const piece = player === 1 ? player1Piece : player2Piece;
     if (!piece) return;
     
-    // Update board with all cells of the tetromino
-    const newBoard = [...board];
+    // Create new board with piece locked in place
+    const newBoard = [...board.map(row => [...row])];
     
-    // Place each cell of the tetromino on the board
+    // Place piece on board
     piece.shape.forEach((row, rowIndex) => {
       row.forEach((cell, colIndex) => {
         if (cell) {
           const boardY = piece.position.y + rowIndex;
           const boardX = piece.position.x + colIndex;
           
-          // Only place cells that are within the board
           if (
             boardY >= 0 && 
             boardY < boardHeight && 
@@ -212,18 +206,23 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
     let completedLines = 0;
     for (let y = boardHeight - 1; y >= 0; y--) {
       if (newBoard[y].every(cell => cell !== null)) {
-        completedLines++;
-        // Remove the completed line and add a new empty line at the top
+        // Remove completed line
         newBoard.splice(y, 1);
+        // Add new empty line at top
         newBoard.unshift(Array(boardWidth).fill(null));
+        completedLines++;
+        // Move check position up since we removed a line
+        y++;
       }
     }
     
+    // Update board
     setBoard(newBoard);
     
-    // Update score based on completed lines
+    // Update score
     const lineScore = completedLines * 100;
-    const newScore = score + lineScore;
+    const placementScore = 10;
+    const newScore = score + lineScore + placementScore;
     setScore(newScore);
     
     if (lineScore > 0) {
