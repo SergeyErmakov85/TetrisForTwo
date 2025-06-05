@@ -90,23 +90,24 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
       position: { x: Math.floor(boardWidth * 3 / 4), y: 0 }
     });
   };
-  
-  // Move a player's piece
-  const movePiece = (player: 1 | 2, dx: number, dy: number): boolean => {
-    const piece = player === 1 ? player1Piece : player2Piece;
-    if (!piece) return false;
-    
-    const newPosition = {
-      x: piece.position.x + dx,
-      y: piece.position.y + dy
-    };
-    
-    // Check if any part of the piece would be out of bounds or colliding with existing pieces
+
+  // Check if a piece collides with the board or other pieces
+  const checkCollision = (
+    piece: {
+      shape: number[][];
+      position: { x: number; y: number };
+    },
+    otherPiece: {
+      shape: number[][];
+      position: { x: number; y: number };
+    } | null
+  ): boolean => {
+    // Check each cell of the piece
     for (let y = 0; y < piece.shape.length; y++) {
       for (let x = 0; x < piece.shape[y].length; x++) {
         if (piece.shape[y][x]) {
-          const boardX = newPosition.x + x;
-          const boardY = newPosition.y + y;
+          const boardX = piece.position.x + x;
+          const boardY = piece.position.y + y;
           
           // Check boundaries
           if (
@@ -115,16 +116,15 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
             boardY < 0 || 
             boardY >= boardHeight
           ) {
-            return false;
+            return true;
           }
           
-          // Check collision with existing pieces on the board
-          if (boardY < boardHeight && board[boardY][boardX] !== null) {
-            return false;
+          // Check collision with placed pieces on the board
+          if (boardY >= 0 && board[boardY][boardX] !== null) {
+            return true;
           }
           
           // Check collision with other player's piece
-          const otherPiece = player === 1 ? player2Piece : player1Piece;
           if (otherPiece) {
             for (let oy = 0; oy < otherPiece.shape.length; oy++) {
               for (let ox = 0; ox < otherPiece.shape[oy].length; ox++) {
@@ -133,7 +133,7 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
                   boardX === otherPiece.position.x + ox && 
                   boardY === otherPiece.position.y + oy
                 ) {
-                  return false;
+                  return true;
                 }
               }
             }
@@ -141,18 +141,40 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
         }
       }
     }
+    return false;
+  };
+  
+  // Move a player's piece
+  const movePiece = (player: 1 | 2, dx: number, dy: number): boolean => {
+    const piece = player === 1 ? player1Piece : player2Piece;
+    const otherPiece = player === 1 ? player2Piece : player1Piece;
+    
+    if (!piece) return false;
+    
+    const newPosition = {
+      x: piece.position.x + dx,
+      y: piece.position.y + dy
+    };
+    
+    const newPiece = {
+      ...piece,
+      position: newPosition
+    };
+    
+    // Check collision with board and other piece
+    if (checkCollision(newPiece, otherPiece)) {
+      // If moving down causes collision, lock the piece
+      if (dy > 0) {
+        placePiece(player);
+      }
+      return false;
+    }
     
     // Update piece position
     if (player === 1) {
-      setPlayer1Piece({
-        ...piece,
-        position: newPosition
-      });
+      setPlayer1Piece(newPiece);
     } else {
-      setPlayer2Piece({
-        ...piece,
-        position: newPosition
-      });
+      setPlayer2Piece(newPiece);
     }
     
     return true;
@@ -186,23 +208,36 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
       });
     });
     
+    // Check for completed lines
+    let completedLines = 0;
+    for (let y = boardHeight - 1; y >= 0; y--) {
+      if (newBoard[y].every(cell => cell !== null)) {
+        completedLines++;
+        // Remove the completed line and add a new empty line at the top
+        newBoard.splice(y, 1);
+        newBoard.unshift(Array(boardWidth).fill(null));
+      }
+    }
+    
     setBoard(newBoard);
     
-    // Update score
-    const newScore = score + 100;
+    // Update score based on completed lines
+    const lineScore = completedLines * 100;
+    const newScore = score + lineScore;
     setScore(newScore);
-    playSuccess();
+    
+    if (lineScore > 0) {
+      playSuccess();
+    }
     
     // Check win condition
     if (newScore >= scoreLimit) {
       end();
-      // Stop game loop and prevent further interaction
       return;
     }
     
-    // Spawn new piece for the player with a different type
+    // Spawn new piece for the player
     if (player === 1) {
-      // Generate a type different from player 2's type if it exists
       let newType = getRandomTetromino();
       if (player2Piece) {
         while (newType === player2Piece.type) {
@@ -216,7 +251,6 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
         position: { x: Math.floor(boardWidth / 4), y: 0 }
       });
     } else {
-      // Generate a type different from player 1's type if it exists
       let newType = getRandomTetromino();
       if (player1Piece) {
         while (newType === player1Piece.type) {
@@ -340,7 +374,6 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
           let player1Type: TetrominoType | null = null;
           
           if (player1Piece) {
-            // Check each cell of the tetromino shape
             player1Piece.shape.forEach((row, rowIndex) => {
               row.forEach((cell, colIndex) => {
                 if (cell && 
@@ -358,7 +391,6 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
           let player2Type: TetrominoType | null = null;
           
           if (player2Piece) {
-            // Check each cell of the tetromino shape
             player2Piece.shape.forEach((row, rowIndex) => {
               row.forEach((cell, colIndex) => {
                 if (cell && 
@@ -376,9 +408,9 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
           if (cell) {
             cellColor = TETROMINO_COLORS[cell]; // Placed piece
           } else if (isPlayer1Piece && player1Type) {
-            cellColor = TETROMINO_COLORS[player1Type]; // Player 1 piece with correct tetromino color
+            cellColor = TETROMINO_COLORS[player1Type]; // Player 1 piece
           } else if (isPlayer2Piece && player2Type) {
-            cellColor = TETROMINO_COLORS[player2Type]; // Player 2 piece with correct tetromino color
+            cellColor = TETROMINO_COLORS[player2Type]; // Player 2 piece
           }
           
           return (
