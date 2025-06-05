@@ -96,28 +96,32 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
       shape: number[][];
       position: { x: number; y: number };
     },
+    dx: number = 0,
+    dy: number = 0,
     otherPiece: {
       shape: number[][];
       position: { x: number; y: number };
-    } | null
+    } | null = null
   ): boolean => {
+    const newX = piece.position.x + dx;
+    const newY = piece.position.y + dy;
+
     for (let y = 0; y < piece.shape.length; y++) {
       for (let x = 0; x < piece.shape[y].length; x++) {
         if (piece.shape[y][x]) {
-          const boardX = piece.position.x + x;
-          const boardY = piece.position.y + y;
+          const boardX = newX + x;
+          const boardY = newY + y;
 
           // Check boundaries
           if (
             boardX < 0 ||
             boardX >= boardWidth ||
-            boardY < 0 ||
             boardY >= boardHeight
           ) {
             return true;
           }
 
-          // Check collision with placed pieces
+          // Check collision with placed pieces on the board
           if (boardY >= 0 && board[boardY][boardX] !== null) {
             return true;
           }
@@ -149,6 +153,15 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
     
     if (!piece) return false;
     
+    // Check if move would cause collision
+    if (wouldCollide(piece, dx, dy, otherPiece)) {
+      if (dy > 0) {
+        placePiece(player);
+      }
+      return false;
+    }
+    
+    // Update piece position
     const newPiece = {
       ...piece,
       position: {
@@ -157,15 +170,6 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
       }
     };
     
-    // Check if move would cause collision
-    if (wouldCollide(newPiece, otherPiece)) {
-      if (dy > 0) {
-        placePiece(player);
-      }
-      return false;
-    }
-    
-    // Update piece position
     if (player === 1) {
       setPlayer1Piece(newPiece);
     } else {
@@ -181,7 +185,7 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
     if (!piece) return;
     
     // Create new board with piece locked in place
-    const newBoard = [...board.map(row => [...row])];
+    const newBoard = board.map(row => [...row]);
     
     // Place piece on board
     piece.shape.forEach((row, rowIndex) => {
@@ -211,8 +215,6 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
         // Add new empty line at top
         newBoard.unshift(Array(boardWidth).fill(null));
         completedLines++;
-        // Move check position up since we removed a line
-        y++;
       }
     }
     
@@ -225,7 +227,7 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
     const newScore = score + lineScore + placementScore;
     setScore(newScore);
     
-    if (lineScore > 0) {
+    if (completedLines > 0) {
       playSuccess();
     }
     
