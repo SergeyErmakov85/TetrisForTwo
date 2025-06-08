@@ -33,6 +33,7 @@ function App() {
   const [countdown, setCountdown] = useState<number | null>(3);
   const [showModeSelect, setShowModeSelect] = useState(true);
   const [showCoopSettings, setShowCoopSettings] = useState(false);
+  const [showControlsGuide, setShowControlsGuide] = useState(false);
   const [tempScoreLimit, setTempScoreLimit] = useState(scoreLimit);
   
   // Player state
@@ -136,6 +137,277 @@ function App() {
     setIsPlaying(false);
     setCountdown(3);
   };
+
+  // Render the controls guide screen
+  if (showControlsGuide) {
+    return (
+      <div style={{ 
+        backgroundColor: "#111827", 
+        width: "100vw", 
+        height: "100vh", 
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "white",
+        fontFamily: "'Inter', sans-serif",
+        padding: "2rem"
+      }}>
+        <div style={{ 
+          backgroundColor: "#1f2937",
+          padding: "2rem",
+          borderRadius: "1rem",
+          width: "100%",
+          maxWidth: "800px",
+          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)"
+        }}>
+          <h1 style={{ 
+            fontSize: "2.5rem", 
+            marginBottom: "2rem", 
+            textAlign: "center",
+            background: "linear-gradient(135deg, #4f46e5, #06b6d4)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text"
+          }}>
+            🎮 Полная схема управления
+          </h1>
+          
+          <div style={{ 
+            display: "grid", 
+            gridTemplateColumns: "1fr 1fr", 
+            gap: "2rem",
+            marginBottom: "2rem"
+          }}>
+            {/* Player 1 Controls */}
+            <div style={{ 
+              backgroundColor: "#374151",
+              padding: "1.5rem",
+              borderRadius: "0.75rem",
+              border: "2px solid #4f46e5"
+            }}>
+              <h2 style={{ 
+                fontSize: "1.5rem", 
+                marginBottom: "1rem", 
+                color: "#4f46e5",
+                textAlign: "center"
+              }}>
+                👤 Игрок 1 (WASD)
+              </h2>
+              
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>Влево:</span>
+                  <kbd style={{ 
+                    backgroundColor: "#4f46e5", 
+                    color: "white", 
+                    padding: "0.25rem 0.5rem", 
+                    borderRadius: "0.25rem",
+                    fontWeight: "bold"
+                  }}>A</kbd>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>Вправо:</span>
+                  <kbd style={{ 
+                    backgroundColor: "#4f46e5", 
+                    color: "white", 
+                    padding: "0.25rem 0.5rem", 
+                    borderRadius: "0.25rem",
+                    fontWeight: "bold"
+                  }}>D</kbd>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>Вниз (ускорение):</span>
+                  <kbd style={{ 
+                    backgroundColor: "#4f46e5", 
+                    color: "white", 
+                    padding: "0.25rem 0.5rem", 
+                    borderRadius: "0.25rem",
+                    fontWeight: "bold"
+                  }}>S</kbd>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>Мгновенный сброс:</span>
+                  <kbd style={{ 
+                    backgroundColor: "#4f46e5", 
+                    color: "white", 
+                    padding: "0.25rem 0.5rem", 
+                    borderRadius: "0.25rem",
+                    fontWeight: "bold"
+                  }}>W</kbd>
+                </div>
+                <hr style={{ border: "1px solid #4b5563", margin: "0.5rem 0" }} />
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>Поворот влево ↺:</span>
+                  <kbd style={{ 
+                    backgroundColor: "#059669", 
+                    color: "white", 
+                    padding: "0.25rem 0.5rem", 
+                    borderRadius: "0.25rem",
+                    fontWeight: "bold"
+                  }}>Q</kbd>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>Поворот вправо ↻:</span>
+                  <kbd style={{ 
+                    backgroundColor: "#059669", 
+                    color: "white", 
+                    padding: "0.25rem 0.5rem", 
+                    borderRadius: "0.25rem",
+                    fontWeight: "bold"
+                  }}>E</kbd>
+                </div>
+              </div>
+            </div>
+
+            {/* Player 2 Controls */}
+            <div style={{ 
+              backgroundColor: "#374151",
+              padding: "1.5rem",
+              borderRadius: "0.75rem",
+              border: "2px solid #ef4444"
+            }}>
+              <h2 style={{ 
+                fontSize: "1.5rem", 
+                marginBottom: "1rem", 
+                color: "#ef4444",
+                textAlign: "center"
+              }}>
+                👤 Игрок 2 (Стрелки)
+              </h2>
+              
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>Влево:</span>
+                  <kbd style={{ 
+                    backgroundColor: "#ef4444", 
+                    color: "white", 
+                    padding: "0.25rem 0.5rem", 
+                    borderRadius: "0.25rem",
+                    fontWeight: "bold"
+                  }}>←</kbd>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>Вправо:</span>
+                  <kbd style={{ 
+                    backgroundColor: "#ef4444", 
+                    color: "white", 
+                    padding: "0.25rem 0.5rem", 
+                    borderRadius: "0.25rem",
+                    fontWeight: "bold"
+                  }}>→</kbd>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>Вниз (ускорение):</span>
+                  <kbd style={{ 
+                    backgroundColor: "#ef4444", 
+                    color: "white", 
+                    padding: "0.25rem 0.5rem", 
+                    borderRadius: "0.25rem",
+                    fontWeight: "bold"
+                  }}>↓</kbd>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>Мгновенный сброс:</span>
+                  <kbd style={{ 
+                    backgroundColor: "#ef4444", 
+                    color: "white", 
+                    padding: "0.25rem 0.5rem", 
+                    borderRadius: "0.25rem",
+                    fontWeight: "bold"
+                  }}>↑</kbd>
+                </div>
+                <hr style={{ border: "1px solid #4b5563", margin: "0.5rem 0" }} />
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>Поворот влево ↺:</span>
+                  <kbd style={{ 
+                    backgroundColor: "#059669", 
+                    color: "white", 
+                    padding: "0.25rem 0.5rem", 
+                    borderRadius: "0.25rem",
+                    fontWeight: "bold"
+                  }}>.</kbd>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>Поворот вправо ↻:</span>
+                  <kbd style={{ 
+                    backgroundColor: "#059669", 
+                    color: "white", 
+                    padding: "0.25rem 0.5rem", 
+                    borderRadius: "0.25rem",
+                    fontWeight: "bold"
+                  }}>/</kbd>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Additional Info */}
+          <div style={{ 
+            backgroundColor: "#374151",
+            padding: "1.5rem",
+            borderRadius: "0.75rem",
+            marginBottom: "2rem",
+            border: "2px solid #059669"
+          }}>
+            <h3 style={{ 
+              fontSize: "1.25rem", 
+              marginBottom: "1rem", 
+              color: "#059669",
+              textAlign: "center"
+            }}>
+              🔧 Особенности поворота
+            </h3>
+            
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", fontSize: "0.9rem" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem" }}>
+                <span style={{ color: "#10b981", fontWeight: "bold" }}>•</span>
+                <span><strong>Wall Kicks:</strong> Если поворот невозможен, игра автоматически попробует сдвинуть фигурку влево или вправо</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem" }}>
+                <span style={{ color: "#10b981", fontWeight: "bold" }}>•</span>
+                <span><strong>Блокировка поворота:</strong> Если поворот невозможен даже с wall kicks, фигурка останется в прежнем положении</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem" }}>
+                <span style={{ color: "#10b981", fontWeight: "bold" }}>•</span>
+                <span><strong>Универсальность:</strong> Работает в обоих режимах - versus и co-op</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Back Button */}
+          <div style={{ textAlign: "center" }}>
+            <button 
+              onClick={() => setShowControlsGuide(false)}
+              style={{
+                padding: "0.75rem 2rem",
+                backgroundColor: "#4f46e5",
+                border: "none",
+                borderRadius: "0.5rem",
+                color: "white",
+                cursor: "pointer",
+                fontSize: "1.1rem",
+                fontWeight: "bold",
+                transition: "all 0.2s",
+                boxShadow: "0 4px 14px 0 rgba(79, 70, 229, 0.4)"
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.backgroundColor = "#4338ca";
+                e.currentTarget.style.transform = "translateY(-2px)";
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.backgroundColor = "#4f46e5";
+                e.currentTarget.style.transform = "translateY(0)";
+              }}
+            >
+              ← Назад в меню
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Render the co-op settings screen
   if (showCoopSettings) {
@@ -264,7 +536,8 @@ function App() {
         <div style={{ 
           display: "flex", 
           flexDirection: "row", 
-          gap: "2rem"
+          gap: "2rem",
+          marginBottom: "2rem"
         }}>
           <button 
             onClick={() => handleModeSelect("versus")}
@@ -302,6 +575,37 @@ function App() {
             </div>
           </button>
         </div>
+
+        {/* Controls Guide Button */}
+        <button 
+          onClick={() => setShowControlsGuide(true)}
+          style={{
+            padding: "0.5rem 1.5rem",
+            fontSize: "0.9rem",
+            backgroundColor: "transparent",
+            border: "2px solid #6b7280",
+            borderRadius: "0.5rem",
+            color: "#9ca3af",
+            cursor: "pointer",
+            transition: "all 0.2s",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem"
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.borderColor = "#4f46e5";
+            e.currentTarget.style.color = "#4f46e5";
+            e.currentTarget.style.backgroundColor = "rgba(79, 70, 229, 0.1)";
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.borderColor = "#6b7280";
+            e.currentTarget.style.color = "#9ca3af";
+            e.currentTarget.style.backgroundColor = "transparent";
+          }}
+        >
+          <span style={{ fontSize: "1rem" }}>🎮</span>
+          Полная схема управления
+        </button>
       </div>
     );
   }
