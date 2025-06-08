@@ -235,7 +235,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
             animation: 'pulse 0.5s infinite'
           }}
         >
-          1s Control!
+          0.5s Control!
         </div>
       )}
       

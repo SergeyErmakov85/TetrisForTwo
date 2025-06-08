@@ -115,6 +115,18 @@ export const useTetris = (player: 1 | 2): TetrisHook => {
     }
   }, [activePiece, gameOver, spawnPiece]);
   
+  // Check if piece can fall further
+  const canFallFurther = useCallback((piece: ActivePiece): boolean => {
+    const testPiece = {
+      ...piece,
+      position: {
+        x: piece.position.x,
+        y: piece.position.y + 1
+      }
+    };
+    return !checkCollision(board, testPiece);
+  }, [board]);
+  
   // Move a piece
   const movePiece = useCallback((dx: number, dy: number): boolean => {
     if (!activePiece || gameOver) return false;
@@ -140,8 +152,22 @@ export const useTetris = (player: 1 | 2): TetrisHook => {
     
     // Update the active piece
     setActivePiece(newActivePiece);
+    
+    // If we're in hard drop mode and moved horizontally, check if piece can fall further
+    if (isHardDropping && dx !== 0) {
+      // Check if the piece can fall further from its new position
+      if (canFallFurther(newActivePiece)) {
+        // Continue falling
+        let fallingPiece = { ...newActivePiece };
+        while (canFallFurther(fallingPiece)) {
+          fallingPiece.position.y++;
+        }
+        setActivePiece(fallingPiece);
+      }
+    }
+    
     return true;
-  }, [activePiece, board, gameOver]);
+  }, [activePiece, board, gameOver, isHardDropping, canFallFurther]);
   
   // Rotate a piece
   const rotatePiece = useCallback((direction: 'left' | 'right'): boolean => {
@@ -201,7 +227,7 @@ export const useTetris = (player: 1 | 2): TetrisHook => {
     return true;
   }, [activePiece, board, gameOver, isHardDropping]);
   
-  // Hard drop - move piece all the way down with 1 second control
+  // Hard drop - move piece all the way down with 0.5 second control
   const hardDrop = useCallback((): number => {
     if (!activePiece || gameOver || isHardDropping) return 0;
     
@@ -231,14 +257,14 @@ export const useTetris = (player: 1 | 2): TetrisHook => {
     // Update the active piece to the dropped position
     setActivePiece(currentPiece);
     
-    // Start hard drop mode with 1 second timer
+    // Start hard drop mode with 0.5 second timer
     setIsHardDropping(true);
     
-    // Set timer to lock the piece after 1 second
+    // Set timer to lock the piece after 0.5 seconds
     const timer = setTimeout(() => {
       setIsHardDropping(false);
       lockPiece();
-    }, 1000);
+    }, 500); // Changed from 1000ms to 500ms
     
     setHardDropTimer(timer);
     

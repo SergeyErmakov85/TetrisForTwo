@@ -232,12 +232,27 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
     return false;
   };
   
+  // Check if piece can fall further
+  const canFallFurther = (
+    piece: {
+      shape: number[][];
+      position: { x: number; y: number };
+    },
+    otherPiece: {
+      shape: number[][];
+      position: { x: number; y: number };
+    } | null
+  ): boolean => {
+    return !wouldCollideBoard(piece, 0, 1) && !wouldCollidePiece(piece, otherPiece, 0, 1);
+  };
+  
   // Move a player's piece
   const movePiece = (player: 1 | 2, dx: number, dy: number): boolean => {
     if (gameOver) return false;
     
     const piece = player === 1 ? player1Piece : player2Piece;
     const otherPiece = player === 1 ? player2Piece : player1Piece;
+    const isHardDropping = player === 1 ? player1HardDropping : player2HardDropping;
     
     if (!piece) return false;
     
@@ -268,6 +283,24 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
       setPlayer1Piece(newPiece);
     } else {
       setPlayer2Piece(newPiece);
+    }
+    
+    // If we're in hard drop mode and moved horizontally, check if piece can fall further
+    if (isHardDropping && dx !== 0) {
+      // Check if the piece can fall further from its new position
+      if (canFallFurther(newPiece, otherPiece)) {
+        // Continue falling
+        let fallingPiece = { ...newPiece };
+        while (canFallFurther(fallingPiece, otherPiece)) {
+          fallingPiece.position.y++;
+        }
+        
+        if (player === 1) {
+          setPlayer1Piece(fallingPiece);
+        } else {
+          setPlayer2Piece(fallingPiece);
+        }
+      }
     }
     
     return true;
@@ -387,7 +420,7 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
       setPlayer2HardDropping(true);
     }
     
-    // Set timer to lock the piece after 1 second
+    // Set timer to lock the piece after 0.5 seconds
     const timer = setTimeout(() => {
       if (player === 1) {
         setPlayer1HardDropping(false);
@@ -395,7 +428,7 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
         setPlayer2HardDropping(false);
       }
       placePiece(player);
-    }, 1000);
+    }, 500); // Changed from 1000ms to 500ms
     
     setHardDropTimers(prev => ({
       ...prev,
@@ -684,7 +717,7 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
             zIndex: 20
           }}
         >
-          P1: 1s Control!
+          P1: 0.5s Control!
         </div>
       )}
       
@@ -705,7 +738,7 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
             zIndex: 20
           }}
         >
-          P2: 1s Control!
+          P2: 0.5s Control!
         </div>
       )}
       
