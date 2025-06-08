@@ -18,6 +18,7 @@ interface CoopGameBoardProps {
   isPlaying: boolean;
   score: number;
   setScore: (value: number) => void;
+  onGameOver?: () => void; // Add callback for game over
 }
 
 const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
@@ -27,7 +28,8 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
   boardHeight,
   isPlaying,
   score,
-  setScore
+  setScore,
+  onGameOver
 }) => {
   const { playHit, playSuccess } = useAudio();
   const { scoreLimit, end } = useGame();
@@ -51,14 +53,31 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
     position: { x: number; y: number };
   } | null>(null);
   
+  // Game over state
+  const [gameOver, setGameOver] = React.useState(false);
+  
   // Reset board when isPlaying changes
   useEffect(() => {
     if (isPlaying) {
       setBoard(generateEmptyBoard(boardWidth, boardHeight));
+      setGameOver(false);
       spawnNewPieces();
       setScore(0);
     }
   }, [isPlaying, boardWidth, boardHeight, setScore]);
+  
+  // Check if the top rows are blocked (game over condition)
+  const checkGameOver = (currentBoard: (TetrominoType | null)[][]) => {
+    // Check if any of the top 2 rows have pieces (spawn area is blocked)
+    for (let y = 0; y < 2; y++) {
+      for (let x = 0; x < boardWidth; x++) {
+        if (currentBoard[y][x] !== null) {
+          return true;
+        }
+      }
+    }
+    return false;
+  };
   
   // Randomly select a tetromino type
   const getRandomTetromino = (): TetrominoType => {
@@ -171,6 +190,8 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
   
   // Move a player's piece
   const movePiece = (player: 1 | 2, dx: number, dy: number): boolean => {
+    if (gameOver) return false;
+    
     const piece = player === 1 ? player1Piece : player2Piece;
     const otherPiece = player === 1 ? player2Piece : player1Piece;
     
@@ -210,6 +231,8 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
   
   // Place a piece on the board permanently
   const placePiece = (player: 1 | 2) => {
+    if (gameOver) return;
+    
     const piece = player === 1 ? player1Piece : player2Piece;
     if (!piece) return;
     
@@ -234,6 +257,17 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
         }
       });
     });
+    
+    // Check for game over condition after placing the piece
+    if (checkGameOver(newBoard)) {
+      console.log('Co-op Game Over! Board is full.');
+      setGameOver(true);
+      setBoard(newBoard);
+      if (onGameOver) {
+        onGameOver();
+      }
+      return;
+    }
     
     // Check for completed lines
     let completedLines = 0;
@@ -298,7 +332,7 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
   
   // Keyboard controls
   useEffect(() => {
-    if (!isPlaying) return;
+    if (!isPlaying || gameOver) return;
     
     const player1Controls = KEYBOARD_CONTROLS.player1;
     const player2Controls = KEYBOARD_CONTROLS.player2;
@@ -332,14 +366,14 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isPlaying, player1Piece, player2Piece, board, playHit, playSuccess, score]);
+  }, [isPlaying, gameOver, player1Piece, player2Piece, board, playHit, playSuccess, score]);
   
   // Game loop - automatically move pieces down
   const lastTimeRef = useRef<number>(0);
   const frameIdRef = useRef<number>(0);
   
   useEffect(() => {
-    if (!isPlaying) return;
+    if (!isPlaying || gameOver) return;
     
     function gameLoop(timestamp: number) {
       if (!lastTimeRef.current) {
@@ -371,7 +405,7 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
     return () => {
       cancelAnimationFrame(frameIdRef.current);
     };
-  }, [isPlaying, player1Piece, player2Piece, board]);
+  }, [isPlaying, gameOver, player1Piece, player2Piece, board]);
   
   return (
     <div style={{ position: 'relative' }}>
@@ -450,6 +484,30 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
           );
         })}
       </div>
+      
+      {/* Game over overlay */}
+      {gameOver && (
+        <div 
+          style={{ 
+            position: 'absolute', 
+            top: '0', 
+            left: '0',
+            width: '100%',
+            height: '100%',
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+            color: '#ffffff',
+            zIndex: 10
+          }}
+        >
+          <h3 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Game Over</h3>
+          <p>Board is full!</p>
+          <p>Final Score: {score}</p>
+        </div>
+      )}
     </div>
   );
 };

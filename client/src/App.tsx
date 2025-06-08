@@ -129,6 +129,14 @@ function App() {
     }, 1000);
   };
 
+  // Handle game over in co-op mode
+  const handleCoopGameOver = () => {
+    console.log('Co-op game over - returning to main menu');
+    setShowModeSelect(true);
+    setIsPlaying(false);
+    setCountdown(3);
+  };
+
   // Render the co-op settings screen
   if (showCoopSettings) {
     return (
@@ -377,6 +385,7 @@ function App() {
             isPlaying={isPlaying}
             score={score}
             setScore={setScore}
+            onGameOver={handleCoopGameOver}
           />
           <div style={{ marginTop: "1rem", textAlign: "center" }}>
             <div style={{ display: "flex", alignItems: "center", flexDirection: "column", gap: "0.5rem" }}>
@@ -576,6 +585,92 @@ function App() {
                 restart();
                 setShowCoopSettings(true);
                 setScore(0);
+              }}
+              style={{
+                padding: "0.75rem 1.5rem",
+                backgroundColor: "#10b981",
+                border: "none",
+                borderRadius: "0.5rem",
+                color: "white",
+                cursor: "pointer",
+                fontSize: "1.1rem"
+              }}
+            >
+              Play Again
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {/* Game over screen for versus mode */}
+      {(player1GameOver || player2GameOver) && mode === "versus" && (
+        <div style={{ 
+          position: "absolute", 
+          top: "0", 
+          left: "0",
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "rgba(0,0,0,0.8)",
+          padding: "2rem",
+          textAlign: "center",
+          zIndex: 100
+        }}>
+          <h2 style={{ 
+            fontSize: "3rem", 
+            marginBottom: "1rem", 
+            color: "#ef4444"
+          }}>
+            Game Over!
+          </h2>
+          
+          {player1GameOver && player2GameOver ? (
+            <p style={{ fontSize: "1.5rem", marginBottom: "2rem" }}>
+              Both players lost!
+            </p>
+          ) : (
+            <p style={{ fontSize: "1.5rem", marginBottom: "2rem" }}>
+              {player1GameOver ? "Player 2 Wins!" : "Player 1 Wins!"}
+            </p>
+          )}
+          
+          <div style={{ marginBottom: "2rem" }}>
+            <p>Player 1 Score: {player1Score}</p>
+            <p>Player 2 Score: {player2Score}</p>
+          </div>
+          
+          <div style={{ display: "flex", gap: "1rem" }}>
+            <button 
+              onClick={() => {
+                setShowModeSelect(true);
+                setPlayer1GameOver(false);
+                setPlayer2GameOver(false);
+                setPlayer1Score(0);
+                setPlayer2Score(0);
+              }}
+              style={{
+                padding: "0.75rem 1.5rem",
+                backgroundColor: "#4f46e5",
+                border: "none",
+                borderRadius: "0.5rem",
+                color: "white",
+                cursor: "pointer",
+                fontSize: "1.1rem"
+              }}
+            >
+              Main Menu
+            </button>
+            
+            <button 
+              onClick={() => {
+                setPlayer1GameOver(false);
+                setPlayer2GameOver(false);
+                setPlayer1Score(0);
+                setPlayer2Score(0);
+                startGame();
               }}
               style={{
                 padding: "0.75rem 1.5rem",

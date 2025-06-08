@@ -54,6 +54,19 @@ export const useTetris = (player: 1 | 2): TetrisHook => {
     setGameOver(false);
   }, []);
   
+  // Check if the top rows are blocked (game over condition)
+  const checkGameOver = useCallback((currentBoard: (TetrominoType | null)[][]) => {
+    // Check if any of the top 2 rows have pieces (spawn area is blocked)
+    for (let y = 0; y < 2; y++) {
+      for (let x = 0; x < BOARD_WIDTH; x++) {
+        if (currentBoard[y][x] !== null) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }, []);
+  
   // Spawn a new piece
   const spawnPiece = useCallback(() => {
     // If there's a next piece, use that, otherwise generate a new one
@@ -71,6 +84,7 @@ export const useTetris = (player: 1 | 2): TetrisHook => {
     // Check if the new piece collides with existing pieces
     if (checkCollision(board, newActivePiece)) {
       // Game over - no space for new piece
+      console.log(`Player ${player} - Game Over! Board is full.`);
       setGameOver(true);
       return false;
     }
@@ -82,7 +96,7 @@ export const useTetris = (player: 1 | 2): TetrisHook => {
     setNextPiece(getRandomTetromino());
     
     return true;
-  }, [board, nextPiece]);
+  }, [board, nextPiece, player]);
   
   // Initialize game
   useEffect(() => {
@@ -245,6 +259,14 @@ export const useTetris = (player: 1 | 2): TetrisHook => {
       updatedBoard.unshift(Array(BOARD_WIDTH).fill(null));
     }
     
+    // Check for game over condition after placing the piece
+    if (checkGameOver(updatedBoard)) {
+      console.log(`Player ${player} - Game Over! Board is full after piece placement.`);
+      setGameOver(true);
+      setBoard(updatedBoard);
+      return;
+    }
+    
     // Update score based on completed lines
     let additionalScore = 0;
     switch (completedLines) {
@@ -268,7 +290,7 @@ export const useTetris = (player: 1 | 2): TetrisHook => {
     setBoard(updatedBoard);
     setActivePiece(null); // Clear active piece to trigger new piece spawn
     setScore(prevScore => prevScore + additionalScore);
-  }, [activePiece, board]);
+  }, [activePiece, board, checkGameOver, player]);
   
   return {
     board,
