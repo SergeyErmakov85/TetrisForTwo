@@ -184,8 +184,12 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
       return false;
     }
 
-    // Check collision with the other active piece (do not lock)
+    // Check collision with the other active piece
     if (wouldCollidePiece(piece, otherPiece, dx, dy)) {
+      // If moving downwards, treat it as a landing
+      if (dy > 0) {
+        placePiece(player);
+      }
       return false;
     }
     
