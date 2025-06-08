@@ -29,6 +29,7 @@ interface TetrisHook {
   nextPiece: Tetromino | null;
   score: number;
   gameOver: boolean;
+  isHardDropping: boolean;
   movePiece: (dx: number, dy: number) => boolean;
   rotatePiece: (direction: 'left' | 'right') => boolean;
   hardDrop: () => number;
@@ -45,6 +46,10 @@ export const useTetris = (player: 1 | 2): TetrisHook => {
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   
+  // Hard drop state
+  const [isHardDropping, setIsHardDropping] = useState(false);
+  const [hardDropTimer, setHardDropTimer] = useState<NodeJS.Timeout | null>(null);
+  
   // Initialize game
   const reset = useCallback(() => {
     setBoard(generateEmptyBoard());
@@ -52,7 +57,12 @@ export const useTetris = (player: 1 | 2): TetrisHook => {
     setNextPiece(null);
     setScore(0);
     setGameOver(false);
-  }, []);
+    setIsHardDropping(false);
+    if (hardDropTimer) {
+      clearTimeout(hardDropTimer);
+      setHardDropTimer(null);
+    }
+  }, [hardDropTimer]);
   
   // Check if the top rows are blocked (game over condition)
   const checkGameOver = useCallback((currentBoard: (TetrominoType | null)[][]) => {
@@ -135,7 +145,7 @@ export const useTetris = (player: 1 | 2): TetrisHook => {
   
   // Rotate a piece
   const rotatePiece = useCallback((direction: 'left' | 'right'): boolean => {
-    if (!activePiece || gameOver) return false;
+    if (!activePiece || gameOver || isHardDropping) return false;
     
     // Create a rotated shape
     const rotatedShape = rotateMatrix(activePiece.shape, direction);
@@ -189,43 +199,62 @@ export const useTetris = (player: 1 | 2): TetrisHook => {
     // Update the active piece with the rotated shape
     setActivePiece(newActivePiece);
     return true;
-  }, [activePiece, board, gameOver]);
+  }, [activePiece, board, gameOver, isHardDropping]);
   
-  // Hard drop - move piece all the way down
+  // Hard drop - move piece all the way down with 1 second control
   const hardDrop = useCallback((): number => {
-    if (!activePiece || gameOver) return 0;
+    if (!activePiece || gameOver || isHardDropping) return 0;
     
     let dropDistance = 0;
-    let canDrop = true;
+    let currentPiece = { ...activePiece };
     
-    while (canDrop) {
-      const newPosition = {
-        x: activePiece.position.x,
-        y: activePiece.position.y + 1
+    // Find the lowest possible position
+    while (true) {
+      const testPosition = {
+        x: currentPiece.position.x,
+        y: currentPiece.position.y + 1
       };
       
-      const newActivePiece = {
-        ...activePiece,
-        position: newPosition
+      const testPiece = {
+        ...currentPiece,
+        position: testPosition
       };
       
-      if (checkCollision(board, newActivePiece)) {
-        canDrop = false;
+      if (checkCollision(board, testPiece)) {
+        break;
       } else {
-        setActivePiece(newActivePiece);
+        currentPiece.position.y++;
         dropDistance++;
       }
     }
     
-    // Lock the piece in place
-    lockPiece();
+    // Update the active piece to the dropped position
+    setActivePiece(currentPiece);
+    
+    // Start hard drop mode with 1 second timer
+    setIsHardDropping(true);
+    
+    // Set timer to lock the piece after 1 second
+    const timer = setTimeout(() => {
+      setIsHardDropping(false);
+      lockPiece();
+    }, 1000);
+    
+    setHardDropTimer(timer);
     
     return dropDistance;
-  }, [activePiece, board, gameOver]);
+  }, [activePiece, board, gameOver, isHardDropping]);
   
   // Lock piece in place and check for completed lines
   const lockPiece = useCallback(() => {
     if (!activePiece) return;
+    
+    // Clear hard drop timer if it exists
+    if (hardDropTimer) {
+      clearTimeout(hardDropTimer);
+      setHardDropTimer(null);
+    }
+    setIsHardDropping(false);
     
     // Create new board with active piece locked in place
     const newBoard = [...board];
@@ -243,6 +272,14 @@ export const useTetris = (player: 1 | 2): TetrisHook => {
       });
     });
     
+    // Check for game over condition after placing the piece
+    if (checkGameOver(newBoard)) {
+      console.log(`Player ${player} - Game Over! Board is full after piece placement.`);
+      setGameOver(true);
+      setBoard(newBoard);
+      return;
+    }
+    
     // Check for completed lines
     let completedLines = 0;
     const updatedBoard = newBoard.filter(row => {
@@ -257,14 +294,6 @@ export const useTetris = (player: 1 | 2): TetrisHook => {
     // Add empty rows at the top
     while (updatedBoard.length < BOARD_HEIGHT) {
       updatedBoard.unshift(Array(BOARD_WIDTH).fill(null));
-    }
-    
-    // Check for game over condition after placing the piece
-    if (checkGameOver(updatedBoard)) {
-      console.log(`Player ${player} - Game Over! Board is full after piece placement.`);
-      setGameOver(true);
-      setBoard(updatedBoard);
-      return;
     }
     
     // Update score based on completed lines
@@ -290,7 +319,16 @@ export const useTetris = (player: 1 | 2): TetrisHook => {
     setBoard(updatedBoard);
     setActivePiece(null); // Clear active piece to trigger new piece spawn
     setScore(prevScore => prevScore + additionalScore);
-  }, [activePiece, board, checkGameOver, player]);
+  }, [activePiece, board, checkGameOver, player, hardDropTimer]);
+  
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (hardDropTimer) {
+        clearTimeout(hardDropTimer);
+      }
+    };
+  }, [hardDropTimer]);
   
   return {
     board,
@@ -298,6 +336,7 @@ export const useTetris = (player: 1 | 2): TetrisHook => {
     nextPiece,
     score,
     gameOver,
+    isHardDropping,
     movePiece,
     rotatePiece,
     hardDrop,

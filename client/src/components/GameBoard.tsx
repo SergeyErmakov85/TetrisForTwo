@@ -35,6 +35,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
     nextPiece,
     score,
     gameOver,
+    isHardDropping,
     movePiece,
     rotatePiece,
     hardDrop,
@@ -91,12 +92,12 @@ const GameBoard: React.FC<GameBoardProps> = ({
     };
   }, [isPlaying, isGameOver, player, movePiece, rotatePiece, hardDrop, playHit]);
 
-  // Game loop - automatically move piece down
+  // Game loop - automatically move piece down (but not during hard drop)
   const lastTimeRef = useRef<number>(0);
   const frameIdRef = useRef<number>(0);
   
   useEffect(() => {
-    if (!isPlaying || isGameOver) return;
+    if (!isPlaying || isGameOver || isHardDropping) return;
     
     function gameLoop(timestamp: number) {
       if (!lastTimeRef.current) {
@@ -121,7 +122,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
     return () => {
       cancelAnimationFrame(frameIdRef.current);
     };
-  }, [isPlaying, isGameOver, score, movePiece]);
+  }, [isPlaying, isGameOver, isHardDropping, score, movePiece]);
   
   // Calculate cell size
   const cellWidth = width / boardWidth;
@@ -140,7 +141,11 @@ const GameBoard: React.FC<GameBoardProps> = ({
           gridTemplateColumns: `repeat(${boardWidth}, 1fr)`,
           gridTemplateRows: `repeat(${boardHeight}, 1fr)`,
           gap: '1px',
-          padding: '2px'
+          padding: '2px',
+          // Add visual indicator for hard drop mode
+          boxShadow: isHardDropping ? 
+            (player === 1 ? '0 0 20px #4f46e5' : '0 0 20px #ef4444') : 'none',
+          transition: 'box-shadow 0.2s'
         }}
       >
         {board.flat().map((cell, i) => {
@@ -174,12 +179,35 @@ const GameBoard: React.FC<GameBoardProps> = ({
               style={{ 
                 backgroundColor: cellType ? TETROMINO_COLORS[cellType] : '#374151',
                 boxShadow: cellType ? 'inset 0 0 5px rgba(255,255,255,0.5)' : 'none',
-                borderRadius: cellType ? '2px' : '0'
+                borderRadius: cellType ? '2px' : '0',
+                // Add pulsing effect for hard dropping piece
+                animation: isActivePiece && isHardDropping ? 'pulse 0.5s infinite' : 'none'
               }}
             />
           );
         })}
       </div>
+      
+      {/* Hard drop indicator */}
+      {isHardDropping && (
+        <div 
+          style={{ 
+            position: 'absolute', 
+            top: '-30px', 
+            left: '50%',
+            transform: 'translateX(-50%)',
+            backgroundColor: player === 1 ? '#4f46e5' : '#ef4444',
+            color: 'white',
+            padding: '4px 8px',
+            borderRadius: '4px',
+            fontSize: '12px',
+            fontWeight: 'bold',
+            animation: 'pulse 0.5s infinite'
+          }}
+        >
+          1s Control!
+        </div>
+      )}
       
       {/* Next piece display */}
       {nextPiece && (
@@ -258,6 +286,17 @@ const GameBoard: React.FC<GameBoardProps> = ({
           <p>Score: {score}</p>
         </div>
       )}
+      
+      {/* Add CSS for pulse animation */}
+      <style>
+        {`
+          @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+          }
+        `}
+      </style>
     </div>
   );
 };
