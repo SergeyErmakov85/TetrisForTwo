@@ -69,19 +69,49 @@ const GameBoard: React.FC<GameBoardProps> = ({
     const controls = KEYBOARD_CONTROLS[playerKey];
     
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Prevent default behavior for game keys
+      if ([
+        ...controls.moveLeft,
+        ...controls.moveRight,
+        ...controls.moveDown,
+        ...controls.rotateLeft,
+        ...controls.rotateRight,
+        ...controls.hardDrop
+      ].includes(e.code)) {
+        e.preventDefault();
+      }
+
       // Player controls based on keyboard input
       if (controls.moveLeft.includes(e.code)) {
-        movePiece(-1, 0) && playHit();
+        const moved = movePiece(-1, 0);
+        if (moved) playHit();
       } else if (controls.moveRight.includes(e.code)) {
-        movePiece(1, 0) && playHit();
+        const moved = movePiece(1, 0);
+        if (moved) playHit();
       } else if (controls.moveDown.includes(e.code)) {
-        movePiece(0, 1) && playHit();
+        const moved = movePiece(0, 1);
+        if (moved) playHit();
       } else if (controls.rotateLeft.includes(e.code)) {
-        rotatePiece('left') && playHit();
+        console.log(`Player ${player} trying to rotate left`);
+        const rotated = rotatePiece('left');
+        if (rotated) {
+          playHit();
+          console.log(`Player ${player} rotated left successfully`);
+        } else {
+          console.log(`Player ${player} rotation left failed`);
+        }
       } else if (controls.rotateRight.includes(e.code)) {
-        rotatePiece('right') && playHit();
+        console.log(`Player ${player} trying to rotate right`);
+        const rotated = rotatePiece('right');
+        if (rotated) {
+          playHit();
+          console.log(`Player ${player} rotated right successfully`);
+        } else {
+          console.log(`Player ${player} rotation right failed`);
+        }
       } else if (controls.hardDrop.includes(e.code)) {
-        hardDrop() && playHit();
+        const dropped = hardDrop();
+        if (dropped > 0) playHit();
       }
     };
 

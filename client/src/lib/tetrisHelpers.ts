@@ -43,7 +43,7 @@ export function checkCollision(
       }
       
       // Check collision with existing pieces
-      if (board[boardY][boardX] !== null) {
+      if (boardY >= 0 && board[boardY][boardX] !== null) {
         return true; // Collision with placed piece
       }
       
@@ -54,29 +54,26 @@ export function checkCollision(
 
 // Rotate a matrix (shape) either left or right
 export function rotateMatrix(matrix: number[][], direction: 'left' | 'right'): number[][] {
-  const n = matrix.length;
-  const rotated: number[][] = [];
-  
-  // Initialize the rotated matrix
-  for (let i = 0; i < n; i++) {
-    rotated[i] = [];
-  }
+  const rows = matrix.length;
+  const cols = matrix[0].length;
   
   if (direction === 'right') {
     // Rotate 90 degrees clockwise
-    for (let i = 0; i < n; i++) {
-      for (let j = 0; j < n; j++) {
-        rotated[i][j] = matrix[n - j - 1][i];
+    const rotated: number[][] = Array(cols).fill(null).map(() => Array(rows).fill(0));
+    for (let i = 0; i < rows; i++) {
+      for (let j = 0; j < cols; j++) {
+        rotated[j][rows - 1 - i] = matrix[i][j];
       }
     }
+    return rotated;
   } else {
     // Rotate 90 degrees counter-clockwise
-    for (let i = 0; i < n; i++) {
-      for (let j = 0; j < n; j++) {
-        rotated[i][j] = matrix[j][n - i - 1];
+    const rotated: number[][] = Array(cols).fill(null).map(() => Array(rows).fill(0));
+    for (let i = 0; i < rows; i++) {
+      for (let j = 0; j < cols; j++) {
+        rotated[cols - 1 - j][i] = matrix[i][j];
       }
     }
+    return rotated;
   }
-  
-  return rotated;
 }

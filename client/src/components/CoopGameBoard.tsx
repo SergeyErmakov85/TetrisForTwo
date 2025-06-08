@@ -99,6 +99,35 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
     return types[Math.floor(Math.random() * types.length)];
   };
   
+  // Rotate a matrix (shape) either left or right
+  const rotateMatrix = (matrix: number[][], direction: 'left' | 'right'): number[][] => {
+    const n = matrix.length;
+    const rotated: number[][] = [];
+    
+    // Initialize the rotated matrix
+    for (let i = 0; i < n; i++) {
+      rotated[i] = [];
+    }
+    
+    if (direction === 'right') {
+      // Rotate 90 degrees clockwise
+      for (let i = 0; i < n; i++) {
+        for (let j = 0; j < n; j++) {
+          rotated[i][j] = matrix[n - j - 1][i];
+        }
+      }
+    } else {
+      // Rotate 90 degrees counter-clockwise
+      for (let i = 0; i < n; i++) {
+        for (let j = 0; j < n; j++) {
+          rotated[i][j] = matrix[j][n - i - 1];
+        }
+      }
+    }
+    
+    return rotated;
+  };
+  
   // Spawn new pieces for both players
   const spawnNewPieces = () => {
     // Generate different tetromino types for each player
@@ -235,6 +264,88 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
       }
     };
     
+    if (player === 1) {
+      setPlayer1Piece(newPiece);
+    } else {
+      setPlayer2Piece(newPiece);
+    }
+    
+    return true;
+  };
+  
+  // Rotate a player's piece
+  const rotatePiece = (player: 1 | 2, direction: 'left' | 'right'): boolean => {
+    if (gameOver) return false;
+    
+    const piece = player === 1 ? player1Piece : player2Piece;
+    const otherPiece = player === 1 ? player2Piece : player1Piece;
+    const isHardDropping = player === 1 ? player1HardDropping : player2HardDropping;
+    
+    if (!piece || isHardDropping) return false;
+    
+    // Create a rotated shape
+    const rotatedShape = rotateMatrix(piece.shape, direction);
+    
+    const newPiece = {
+      ...piece,
+      shape: rotatedShape
+    };
+    
+    // Check for collision with board
+    if (wouldCollideBoard(newPiece)) {
+      // Try wall kicks - move left or right to make rotation possible
+      const originalX = piece.position.x;
+      
+      // Try moving left
+      for (let offset = 1; offset <= 2; offset++) {
+        const testPiece = {
+          ...newPiece,
+          position: {
+            ...newPiece.position,
+            x: originalX - offset
+          }
+        };
+        
+        if (!wouldCollideBoard(testPiece) && !wouldCollidePiece(testPiece, otherPiece)) {
+          if (player === 1) {
+            setPlayer1Piece(testPiece);
+          } else {
+            setPlayer2Piece(testPiece);
+          }
+          return true;
+        }
+      }
+      
+      // Try moving right
+      for (let offset = 1; offset <= 2; offset++) {
+        const testPiece = {
+          ...newPiece,
+          position: {
+            ...newPiece.position,
+            x: originalX + offset
+          }
+        };
+        
+        if (!wouldCollideBoard(testPiece) && !wouldCollidePiece(testPiece, otherPiece)) {
+          if (player === 1) {
+            setPlayer1Piece(testPiece);
+          } else {
+            setPlayer2Piece(testPiece);
+          }
+          return true;
+        }
+      }
+      
+      // If no kick works, rotation fails
+      return false;
+    }
+    
+    // Check collision with other piece
+    if (wouldCollidePiece(newPiece, otherPiece)) {
+      return false;
+    }
+    
+    // Update the piece with the rotated shape
     if (player === 1) {
       setPlayer1Piece(newPiece);
     } else {
@@ -420,6 +531,26 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
     const player2Controls = KEYBOARD_CONTROLS.player2;
     
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Prevent default behavior for game keys
+      const allGameKeys = [
+        ...player1Controls.moveLeft,
+        ...player1Controls.moveRight,
+        ...player1Controls.moveDown,
+        ...player1Controls.rotateLeft,
+        ...player1Controls.rotateRight,
+        ...player1Controls.hardDrop,
+        ...player2Controls.moveLeft,
+        ...player2Controls.moveRight,
+        ...player2Controls.moveDown,
+        ...player2Controls.rotateLeft,
+        ...player2Controls.rotateRight,
+        ...player2Controls.hardDrop
+      ];
+      
+      if (allGameKeys.includes(e.code)) {
+        e.preventDefault();
+      }
+
       // Player 1 controls
       if (player1Controls.moveLeft.includes(e.code)) {
         movePiece(1, -1, 0) && playHit();
@@ -427,6 +558,24 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
         movePiece(1, 1, 0) && playHit();
       } else if (player1Controls.moveDown.includes(e.code)) {
         movePiece(1, 0, 1) && playHit();
+      } else if (player1Controls.rotateLeft.includes(e.code)) {
+        console.log('Player 1 trying to rotate left');
+        const rotated = rotatePiece(1, 'left');
+        if (rotated) {
+          playHit();
+          console.log('Player 1 rotated left successfully');
+        } else {
+          console.log('Player 1 rotation left failed');
+        }
+      } else if (player1Controls.rotateRight.includes(e.code)) {
+        console.log('Player 1 trying to rotate right');
+        const rotated = rotatePiece(1, 'right');
+        if (rotated) {
+          playHit();
+          console.log('Player 1 rotated right successfully');
+        } else {
+          console.log('Player 1 rotation right failed');
+        }
       } else if (player1Controls.hardDrop.includes(e.code)) {
         hardDrop(1) && playHit();
       }
@@ -438,6 +587,24 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
         movePiece(2, 1, 0) && playHit();
       } else if (player2Controls.moveDown.includes(e.code)) {
         movePiece(2, 0, 1) && playHit();
+      } else if (player2Controls.rotateLeft.includes(e.code)) {
+        console.log('Player 2 trying to rotate left');
+        const rotated = rotatePiece(2, 'left');
+        if (rotated) {
+          playHit();
+          console.log('Player 2 rotated left successfully');
+        } else {
+          console.log('Player 2 rotation left failed');
+        }
+      } else if (player2Controls.rotateRight.includes(e.code)) {
+        console.log('Player 2 trying to rotate right');
+        const rotated = rotatePiece(2, 'right');
+        if (rotated) {
+          playHit();
+          console.log('Player 2 rotated right successfully');
+        } else {
+          console.log('Player 2 rotation right failed');
+        }
       } else if (player2Controls.hardDrop.includes(e.code)) {
         hardDrop(2) && playHit();
       }
