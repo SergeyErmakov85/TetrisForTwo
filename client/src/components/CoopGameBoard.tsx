@@ -32,7 +32,7 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
   onGameOver
 }) => {
   const { playHit, playSuccess } = useAudio();
-  const { scoreLimit, end } = useGame();
+  const { scoreLimit, end, checkWinCondition } = useGame();
   
   // Create a board state
   const [board, setBoard] = React.useState<(TetrominoType | null)[][]>(
@@ -56,6 +56,9 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
   // Game over state
   const [gameOver, setGameOver] = React.useState(false);
   
+  // Victory state
+  const [showVictory, setShowVictory] = React.useState(false);
+  
   // Hard drop states
   const [player1HardDropping, setPlayer1HardDropping] = React.useState(false);
   const [player2HardDropping, setPlayer2HardDropping] = React.useState(false);
@@ -69,6 +72,7 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
     if (isPlaying) {
       setBoard(generateEmptyBoard(boardWidth, boardHeight));
       setGameOver(false);
+      setShowVictory(false);
       setPlayer1HardDropping(false);
       setPlayer2HardDropping(false);
       // Clear any existing timers
@@ -80,8 +84,25 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
     }
   }, [isPlaying, boardWidth, boardHeight, setScore]);
   
+  // Check for victory condition
+  useEffect(() => {
+    if (checkWinCondition(score) && !showVictory && !gameOver) {
+      console.log('Victory! Score limit reached:', score, '>=', scoreLimit);
+      setShowVictory(true);
+      setGameOver(true);
+      
+      // Show victory message for 3 seconds, then return to menu
+      setTimeout(() => {
+        console.log('Victory timeout - returning to main menu');
+        if (onGameOver) {
+          onGameOver();
+        }
+      }, 3000);
+    }
+  }, [score, scoreLimit, checkWinCondition, showVictory, gameOver, onGameOver]);
+  
   // Check if the top rows are blocked (game over condition)
-  const checkGameOver = (currentBoard: (TetrominoType | null)[][]) => {
+  const checkGameOverCondition = (currentBoard: (TetrominoType | null)[][]) => {
     // Check if any of the top 2 rows have pieces (spawn area is blocked)
     for (let y = 0; y < 2; y++) {
       for (let x = 0; x < boardWidth; x++) {
@@ -485,7 +506,7 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
     });
     
     // Check for game over condition after placing the piece
-    if (checkGameOver(newBoard)) {
+    if (checkGameOverCondition(newBoard)) {
       console.log('Co-op Game Over! Board is full.');
       setGameOver(true);
       setBoard(newBoard);
@@ -518,12 +539,6 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
     
     if (completedLines > 0) {
       playSuccess();
-    }
-    
-    // Check win condition
-    if (newScore >= scoreLimit) {
-      end();
-      return;
     }
     
     // Spawn new piece for the player
@@ -699,6 +714,74 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
   
   return (
     <div style={{ position: 'relative' }}>
+      {/* Victory Screen */}
+      {showVictory && (
+        <div 
+          style={{ 
+            position: 'absolute', 
+            top: '0', 
+            left: '0',
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'rgba(0,0,0,0.9)',
+            zIndex: 100,
+            flexDirection: 'column'
+          }}
+        >
+          <div style={{
+            textAlign: 'center',
+            animation: 'victoryPulse 1s ease-in-out infinite alternate'
+          }}>
+            <h1 style={{ 
+              fontSize: '4rem', 
+              color: '#10b981',
+              textShadow: '0 0 20px rgba(16, 185, 129, 0.8)',
+              marginBottom: '1rem',
+              fontWeight: 'bold'
+            }}>
+              ВЫ ПОБЕДИЛИ!
+            </h1>
+            <p style={{ 
+              fontSize: '1.5rem', 
+              color: '#ffffff',
+              marginBottom: '1rem'
+            }}>
+              Цель достигнута: {score} очков!
+            </p>
+            <p style={{ 
+              fontSize: '1rem', 
+              color: '#9ca3af'
+            }}>
+              Возврат в главное меню через 3 секунды...
+            </p>
+          </div>
+          
+          {/* Animated confetti-like elements */}
+          <div style={{ position: 'absolute', width: '100%', height: '100%', pointerEvents: 'none' }}>
+            {Array.from({ length: 50 }).map((_, i) => (
+              <div 
+                key={i} 
+                style={{ 
+                  position: 'absolute',
+                  top: `${Math.random() * 100}%`,
+                  left: `${Math.random() * 100}%`,
+                  width: `${Math.random() * 10 + 5}px`,
+                  height: `${Math.random() * 10 + 5}px`,
+                  backgroundColor: `hsl(${Math.random() * 360}, 100%, 70%)`,
+                  borderRadius: '50%',
+                  animation: `confettiFall ${Math.random() * 3 + 2}s linear infinite`,
+                  animationDelay: `${Math.random() * 2}s`,
+                  opacity: Math.random() * 0.8 + 0.2
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+      
       {/* Hard drop indicators */}
       {player1HardDropping && (
         <div 
@@ -828,7 +911,7 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
       </div>
       
       {/* Game over overlay */}
-      {gameOver && (
+      {gameOver && !showVictory && (
         <div 
           style={{ 
             position: 'absolute', 
@@ -851,13 +934,29 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
         </div>
       )}
       
-      {/* Add CSS for pulse animation */}
+      {/* Add CSS for animations */}
       <style>
         {`
           @keyframes pulse {
             0% { opacity: 1; }
             50% { opacity: 0.7; }
             100% { opacity: 1; }
+          }
+          
+          @keyframes victoryPulse {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.05); }
+          }
+          
+          @keyframes confettiFall {
+            0% {
+              transform: translateY(-20px) rotate(0deg);
+              opacity: 1;
+            }
+            100% {
+              transform: translateY(150px) rotate(360deg);
+              opacity: 0;
+            }
           }
         `}
       </style>
