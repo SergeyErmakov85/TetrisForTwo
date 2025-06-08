@@ -90,18 +90,14 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
     });
   };
 
-  // Check if a piece would collide at the given position
-  const wouldCollide = (
+  // Check if a piece would collide with the board (placed pieces or bounds)
+  const wouldCollideBoard = (
     piece: {
       shape: number[][];
       position: { x: number; y: number };
     },
     dx: number = 0,
-    dy: number = 0,
-    otherPiece: {
-      shape: number[][];
-      position: { x: number; y: number };
-    } | null = null
+    dy: number = 0
   ): boolean => {
     const newX = piece.position.x + dx;
     const newY = piece.position.y + dy;
@@ -126,23 +122,50 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
             return true;
           }
 
-          // Check collision with other active piece
-          if (otherPiece) {
-            for (let oy = 0; oy < otherPiece.shape.length; oy++) {
-              for (let ox = 0; ox < otherPiece.shape[oy].length; ox++) {
-                if (
-                  otherPiece.shape[oy][ox] &&
-                  boardX === otherPiece.position.x + ox &&
-                  boardY === otherPiece.position.y + oy
-                ) {
-                  return true;
-                }
+        }
+      }
+    }
+    return false;
+  };
+
+  // Check if a piece would collide with the other active piece only
+  const wouldCollidePiece = (
+    piece: {
+      shape: number[][];
+      position: { x: number; y: number };
+    },
+    otherPiece: {
+      shape: number[][];
+      position: { x: number; y: number };
+    } | null,
+    dx: number = 0,
+    dy: number = 0
+  ): boolean => {
+    if (!otherPiece) return false;
+    const newX = piece.position.x + dx;
+    const newY = piece.position.y + dy;
+
+    for (let y = 0; y < piece.shape.length; y++) {
+      for (let x = 0; x < piece.shape[y].length; x++) {
+        if (piece.shape[y][x]) {
+          const boardX = newX + x;
+          const boardY = newY + y;
+
+          for (let oy = 0; oy < otherPiece.shape.length; oy++) {
+            for (let ox = 0; ox < otherPiece.shape[oy].length; ox++) {
+              if (
+                otherPiece.shape[oy][ox] &&
+                boardX === otherPiece.position.x + ox &&
+                boardY === otherPiece.position.y + oy
+              ) {
+                return true;
               }
             }
           }
         }
       }
     }
+
     return false;
   };
   
@@ -153,11 +176,16 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
     
     if (!piece) return false;
     
-    // Check if move would cause collision
-    if (wouldCollide(piece, dx, dy, otherPiece)) {
+    // Check collision with board (bounds or placed pieces)
+    if (wouldCollideBoard(piece, dx, dy)) {
       if (dy > 0) {
         placePiece(player);
       }
+      return false;
+    }
+
+    // Check collision with the other active piece (do not lock)
+    if (wouldCollidePiece(piece, otherPiece, dx, dy)) {
       return false;
     }
     
