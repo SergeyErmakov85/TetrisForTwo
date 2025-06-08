@@ -352,18 +352,12 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
       if (deltaTime > 1000) {
         // Move player 1 piece down
         if (player1Piece) {
-          const canMoveDown = movePiece(1, 0, 1);
-          if (!canMoveDown) {
-            placePiece(1);
-          }
+          movePiece(1, 0, 1);
         }
-        
+
         // Move player 2 piece down
         if (player2Piece) {
-          const canMoveDown = movePiece(2, 0, 1);
-          if (!canMoveDown) {
-            placePiece(2);
-          }
+          movePiece(2, 0, 1);
         }
         
         lastTimeRef.current = timestamp;
