@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { 
   TETROMINOES, 
   TetrominoType,
@@ -49,6 +49,9 @@ export const useTetris = (player: 1 | 2): TetrisHook => {
   // Hard drop state
   const [isHardDropping, setIsHardDropping] = useState(false);
   const [hardDropTimer, setHardDropTimer] = useState<NodeJS.Timeout | null>(null);
+
+  const boardRef = useRef(board);
+  const activePieceRef = useRef(activePiece);
   
   // Initialize game
   const reset = useCallback(() => {
@@ -114,6 +117,14 @@ export const useTetris = (player: 1 | 2): TetrisHook => {
       spawnPiece();
     }
   }, [activePiece, gameOver, spawnPiece]);
+
+  useEffect(() => {
+    boardRef.current = board;
+  }, [board]);
+
+  useEffect(() => {
+    activePieceRef.current = activePiece;
+  }, [activePiece]);
   
   // Check if piece can fall further
   const canFallFurther = useCallback((piece: ActivePiece): boolean => {
@@ -272,8 +283,9 @@ export const useTetris = (player: 1 | 2): TetrisHook => {
   }, [activePiece, board, gameOver, isHardDropping]);
   
   // Lock piece in place and check for completed lines
-  const lockPiece = useCallback(() => {
-    if (!activePiece) return;
+  const lockPiece = useCallback((pieceOverride?: ActivePiece | null) => {
+    const pieceToLock = pieceOverride ?? activePieceRef.current;
+    if (!pieceToLock) return;
     
     // Clear hard drop timer if it exists
     if (hardDropTimer) {
@@ -283,16 +295,17 @@ export const useTetris = (player: 1 | 2): TetrisHook => {
     setIsHardDropping(false);
     
     // Create new board with active piece locked in place
-    const newBoard = [...board];
+    const baseBoard = boardRef.current;
+    const newBoard = [...baseBoard];
     
-    activePiece.shape.forEach((row, rowIndex) => {
+    pieceToLock.shape.forEach((row, rowIndex) => {
       row.forEach((value, colIndex) => {
         if (value) {
-          const y = activePiece.position.y + rowIndex;
-          const x = activePiece.position.x + colIndex;
+          const y = pieceToLock.position.y + rowIndex;
+          const x = pieceToLock.position.x + colIndex;
           
           if (y >= 0 && y < BOARD_HEIGHT && x >= 0 && x < BOARD_WIDTH) {
-            newBoard[y][x] = activePiece.type;
+            newBoard[y][x] = pieceToLock.type;
           }
         }
       });
@@ -345,7 +358,7 @@ export const useTetris = (player: 1 | 2): TetrisHook => {
     setBoard(updatedBoard);
     setActivePiece(null); // Clear active piece to trigger new piece spawn
     setScore(prevScore => prevScore + additionalScore);
-  }, [activePiece, board, checkGameOver, player, hardDropTimer]);
+  }, [checkGameOver, player, hardDropTimer]);
   
   // Clean up timer on unmount
   useEffect(() => {

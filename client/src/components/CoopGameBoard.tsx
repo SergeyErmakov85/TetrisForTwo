@@ -66,6 +66,10 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
     player1: NodeJS.Timeout | null;
     player2: NodeJS.Timeout | null;
   }>({ player1: null, player2: null });
+
+  const boardRef = useRef(board);
+  const player1PieceRef = useRef(player1Piece);
+  const player2PieceRef = useRef(player2Piece);
   
   // Reset board when isPlaying changes
   useEffect(() => {
@@ -84,6 +88,18 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
       setScore(0);
     }
   }, [isPlaying, boardWidth, boardHeight, setScore]);
+
+  useEffect(() => {
+    boardRef.current = board;
+  }, [board]);
+
+  useEffect(() => {
+    player1PieceRef.current = player1Piece;
+  }, [player1Piece]);
+
+  useEffect(() => {
+    player2PieceRef.current = player2Piece;
+  }, [player2Piece]);
   
   // Check for victory condition
   useEffect(() => {
@@ -500,7 +516,7 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
   const placePiece = (player: 1 | 2) => {
     if (gameOver) return;
     
-    const piece = player === 1 ? player1Piece : player2Piece;
+    const piece = player === 1 ? player1PieceRef.current : player2PieceRef.current;
     if (!piece) return;
     
     // Clear hard drop timer if it exists
@@ -521,7 +537,7 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
     }
     
     // Create new board with piece locked in place
-    const newBoard = board.map(row => [...row]);
+    const newBoard = boardRef.current.map(row => [...row]);
     
     // Place piece on board
     piece.shape.forEach((row, rowIndex) => {
