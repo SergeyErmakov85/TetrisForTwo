@@ -70,7 +70,8 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
   // Reset board when isPlaying changes
   useEffect(() => {
     if (isPlaying) {
-      setBoard(generateEmptyBoard(boardWidth, boardHeight));
+      const newBoard = generateEmptyBoard(boardWidth, boardHeight);
+      setBoard(newBoard);
       setGameOver(false);
       setShowVictory(false);
       setPlayer1HardDropping(false);
@@ -79,7 +80,7 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
       if (hardDropTimers.player1) clearTimeout(hardDropTimers.player1);
       if (hardDropTimers.player2) clearTimeout(hardDropTimers.player2);
       setHardDropTimers({ player1: null, player2: null });
-      spawnNewPieces();
+      spawnNewPieces(newBoard);
       setScore(0);
     }
   }, [isPlaying, boardWidth, boardHeight, setScore]);
@@ -149,28 +150,63 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
     return rotated;
   };
   
+  const handleSpawnGameOver = (boardSnapshot: (TetrominoType | null)[][]) => {
+    console.log('Co-op Game Over! Board is full.');
+    setGameOver(true);
+    setBoard(boardSnapshot);
+    if (onGameOver) {
+      onGameOver();
+    }
+  };
+
+  const getSpawnPosition = (player: 1 | 2) => ({
+    x: player === 1 ? Math.floor(boardWidth / 4) : Math.floor(boardWidth * 3 / 4),
+    y: 0
+  });
+
+  const createPiece = (type: TetrominoType, player: 1 | 2) => ({
+    type,
+    shape: TETROMINOES[type],
+    position: getSpawnPosition(player)
+  });
+
+  const canSpawnPiece = (
+    piece: {
+      shape: number[][];
+      position: { x: number; y: number };
+    },
+    boardSnapshot: (TetrominoType | null)[][],
+    otherPiece: {
+      shape: number[][];
+      position: { x: number; y: number };
+    } | null
+  ) => !wouldCollideBoard(piece, 0, 0, boardSnapshot) && !wouldCollidePiece(piece, otherPiece, 0, 0);
+
   // Spawn new pieces for both players
-  const spawnNewPieces = () => {
+  const spawnNewPieces = (boardSnapshot: (TetrominoType | null)[][]) => {
     // Generate different tetromino types for each player
     const type1 = getRandomTetromino();
     let type2;
     do {
       type2 = getRandomTetromino();
     } while (type2 === type1);
-    
+
+    const newPlayer1Piece = createPiece(type1, 1);
+    const newPlayer2Piece = createPiece(type2, 2);
+
+    if (
+      !canSpawnPiece(newPlayer1Piece, boardSnapshot, newPlayer2Piece) ||
+      !canSpawnPiece(newPlayer2Piece, boardSnapshot, newPlayer1Piece)
+    ) {
+      handleSpawnGameOver(boardSnapshot);
+      return;
+    }
+
     // Player 1 piece (left side)
-    setPlayer1Piece({
-      type: type1,
-      shape: TETROMINOES[type1],
-      position: { x: Math.floor(boardWidth / 4), y: 0 }
-    });
+    setPlayer1Piece(newPlayer1Piece);
     
     // Player 2 piece (right side)
-    setPlayer2Piece({
-      type: type2,
-      shape: TETROMINOES[type2],
-      position: { x: Math.floor(boardWidth * 3 / 4), y: 0 }
-    });
+    setPlayer2Piece(newPlayer2Piece);
   };
 
   // Check if a piece would collide with the board (placed pieces or bounds)
@@ -180,7 +216,8 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
       position: { x: number; y: number };
     },
     dx: number = 0,
-    dy: number = 0
+    dy: number = 0,
+    boardSnapshot: (TetrominoType | null)[][] = board
   ): boolean => {
     const newX = piece.position.x + dx;
     const newY = piece.position.y + dy;
@@ -202,7 +239,7 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
           }
 
           // Check collision with placed pieces on the board
-          if (boardY >= 0 && board[boardY][boardX] !== null) {
+          if (boardY >= 0 && boardSnapshot[boardY][boardX] !== null) {
             return true; // Collision with placed piece
           }
 
@@ -508,11 +545,7 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
     // Check for game over condition after placing the piece
     if (checkGameOverCondition(newBoard)) {
       console.log('Co-op Game Over! Board is full.');
-      setGameOver(true);
-      setBoard(newBoard);
-      if (onGameOver) {
-        onGameOver();
-      }
+      handleSpawnGameOver(newBoard);
       return;
     }
     
@@ -549,12 +582,14 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
           newType = getRandomTetromino();
         }
       }
-      
-      setPlayer1Piece({
-        type: newType,
-        shape: TETROMINOES[newType],
-        position: { x: Math.floor(boardWidth / 4), y: 0 }
-      });
+
+      const newPiece = createPiece(newType, 1);
+      if (!canSpawnPiece(newPiece, newBoard, player2Piece)) {
+        handleSpawnGameOver(newBoard);
+        return;
+      }
+
+      setPlayer1Piece(newPiece);
     } else {
       let newType = getRandomTetromino();
       if (player1Piece) {
@@ -562,12 +597,14 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
           newType = getRandomTetromino();
         }
       }
-      
-      setPlayer2Piece({
-        type: newType,
-        shape: TETROMINOES[newType],
-        position: { x: Math.floor(boardWidth * 3 / 4), y: 0 }
-      });
+
+      const newPiece = createPiece(newType, 2);
+      if (!canSpawnPiece(newPiece, newBoard, player1Piece)) {
+        handleSpawnGameOver(newBoard);
+        return;
+      }
+
+      setPlayer2Piece(newPiece);
     }
   };
   
@@ -668,6 +705,12 @@ const CoopGameBoard: React.FC<CoopGameBoardProps> = ({
   // Game loop - automatically move pieces down (but not during hard drop)
   const lastTimeRef = useRef<number>(0);
   const frameIdRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (!isPlaying || gameOver) {
+      lastTimeRef.current = 0;
+    }
+  }, [isPlaying, gameOver]);
   
   useEffect(() => {
     if (!isPlaying || gameOver) return;

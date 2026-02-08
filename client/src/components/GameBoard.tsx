@@ -125,6 +125,12 @@ const GameBoard: React.FC<GameBoardProps> = ({
   // Game loop - automatically move piece down (but not during hard drop)
   const lastTimeRef = useRef<number>(0);
   const frameIdRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (!isPlaying || isGameOver) {
+      lastTimeRef.current = 0;
+    }
+  }, [isPlaying, isGameOver]);
   
   useEffect(() => {
     if (!isPlaying || isGameOver || isHardDropping) return;
